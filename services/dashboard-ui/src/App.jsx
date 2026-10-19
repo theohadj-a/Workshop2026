@@ -10,19 +10,29 @@ import {
   Activity,
   Server,
   Lock,
-  ArrowRight
+  ArrowRight,
+  Terminal,
+  Trash2,
+  Play,
+  Layers,
+  Sparkles,
+  ShoppingBag,
+  ExternalLink
 } from 'lucide-react';
 
 export default function App() {
+  // Navigation entre les vues
+  const [activeTab, setActiveTab] = useState('payment'); // 'payment' | 'supervision'
+
   // État du formulaire de paiement
   const [amount, setAmount] = useState('49.99');
   const [currency, setCurrency] = useState('EUR');
-  const [customerName, setCustomerName] = useState('Alexandre Martin');
+  const [customerName, setCustomerName] = useState('ALEXANDRE MARTIN');
   const [cardNumber, setCardNumber] = useState('4532 8920 1234 5678');
   const [cardExpiry, setCardExpiry] = useState('08/28');
   const [cardCvv, setCardCvv] = useState('789');
 
-  // État de l'application
+  // État de soumission
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastPaymentResult, setLastPaymentResult] = useState(null);
   const [paymentError, setPaymentError] = useState(null);
@@ -34,11 +44,56 @@ export default function App() {
   const [transactions, setTransactions] = useState([]);
   const [chaosState, setChaosState] = useState({ is_active: false, latency: 0, error_rate: 0 });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRemediating, setIsRemediating] = useState(false);
 
-  // Polling des données de santé et des transactions
+  // Logs et historique de remédiation
+  const [remediationLogs, setRemediationLogs] = useState([]);
+  const [remediationHistory, setRemediationHistory] = useState([]);
+
+  // Gestion intelligente des inputs de carte bancaire (chiffres uniquement + espaces auto)
+  const handleCardNumberChange = (e) => {
+    // Extrait uniquement les chiffres, max 16
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 16);
+    // Insère un espace tous les 4 chiffres
+    const formatted = raw.match(/.{1,4}/g)?.join(' ') || '';
+    setCardNumber(formatted);
+  };
+
+  const handleExpiryChange = (e) => {
+    // Extrait uniquement les chiffres, max 4
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
+    if (raw.length >= 3) {
+      setCardExpiry(`${raw.slice(0, 2)}/${raw.slice(2)}`);
+    } else {
+      setCardExpiry(raw);
+    }
+  };
+
+  const handleCvvChange = (e) => {
+    // Extrait uniquement les chiffres, max 3 ou 4
+    const raw = e.target.value.replace(/\D/g, '').slice(0, 4);
+    setCardCvv(raw);
+  };
+
+  const handleNameChange = (e) => {
+    // Met le nom en majuscules pour le rendu carte
+    setCustomerName(e.target.value.toUpperCase());
+  };
+
+  // Détection automatique du type de carte
+  const getCardBrand = (number) => {
+    const clean = number.replace(/\s+/g, '');
+    if (clean.startsWith('4')) return { name: 'VISA', color: 'from-blue-900 via-indigo-900 to-slate-900' };
+    if (/^(5[1-5]|2[2-7])/.test(clean)) return { name: 'MASTERCARD', color: 'from-orange-950 via-red-950 to-slate-900' };
+    if (/^3[47]/.test(clean)) return { name: 'AMEX', color: 'from-cyan-950 via-teal-950 to-slate-900' };
+    return { name: 'CB', color: 'from-indigo-950 via-slate-900 to-slate-950' };
+  };
+
+  const cardBrand = getCardBrand(cardNumber);
+
+  // Polling des données de santé, transactions et logs
   const fetchData = async () => {
     try {
-      // 1. Health
       const healthRes = await fetch('/health');
       if (healthRes.ok) {
         const data = await healthRes.json();
@@ -53,31 +108,49 @@ export default function App() {
     }
 
     try {
-      // 2. Transactions
       const txRes = await fetch('/api/v1/payments?limit=8');
       if (txRes.ok) {
         const data = await txRes.json();
         setTransactions(data.transactions || []);
       }
     } catch (e) {
-      console.warn("Erreur chargement transactions", e);
+      console.warn("Erreur transactions", e);
     }
 
     try {
-      // 3. Chaos status
       const chaosRes = await fetch('/api/v1/chaos/status');
       if (chaosRes.ok) {
         const cData = await chaosRes.json();
         setChaosState(cData);
       }
     } catch (e) {
-      console.warn("Erreur chargement chaos status", e);
+      console.warn("Erreur chaos", e);
+    }
+
+    try {
+      const logsRes = await fetch('/remediation/api/v1/remediation/logs');
+      if (logsRes.ok) {
+        const lData = await logsRes.json();
+        setRemediationLogs(lData.logs || []);
+      }
+    } catch (e) {
+      console.warn("Erreur logs", e);
+    }
+
+    try {
+      const histRes = await fetch('/remediation/api/v1/remediation/history');
+      if (histRes.ok) {
+        const hData = await histRes.json();
+        setRemediationHistory(hData.history || []);
+      }
+    } catch (e) {
+      console.warn("Erreur historique", e);
     }
   };
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 2500);
+    const interval = setInterval(fetchData, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -88,6 +161,13 @@ export default function App() {
     setPaymentError(null);
     setLastPaymentResult(null);
 
+    const cleanCard = cardNumber.replace(/\s+/g, '');
+    if (cleanCard.length < 12) {
+      setPaymentError("Veuillez saisir un numéro de carte valide à 16 chiffres.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/v1/payments', {
         method: 'POST',
@@ -96,8 +176,8 @@ export default function App() {
           amount: parseFloat(amount),
           currency,
           customer_name: customerName,
-          customer_email: `${customerName.toLowerCase().replace(' ', '.')}@example.fr`,
-          card_number: cardNumber.replace(/\s+/g, ''),
+          customer_email: `${customerName.toLowerCase().replace(/\s+/g, '.')}@example.fr`,
+          card_number: cleanCard,
           card_expiry: cardExpiry,
           card_cvv: cardCvv,
           merchant_id: 'MERCHANT-RESILIENCE-01',
@@ -119,7 +199,7 @@ export default function App() {
     }
   };
 
-  // Simulation d'un lot de 10 paiements
+  // Actions de démo
   const handleSimulateBatch = async () => {
     setIsRefreshing(true);
     try {
@@ -136,7 +216,6 @@ export default function App() {
     }
   };
 
-  // Déclenchement d'un incident contrôlé (Chaos)
   const handleTriggerChaos = async () => {
     try {
       await fetch('/api/v1/chaos/configure', {
@@ -150,7 +229,6 @@ export default function App() {
     }
   };
 
-  // Réinitialisation de l'état nominal
   const handleResetChaos = async () => {
     try {
       await fetch('/api/v1/chaos/reset', { method: 'POST' });
@@ -160,288 +238,517 @@ export default function App() {
     }
   };
 
+  const handleTriggerRemediation = async () => {
+    setIsRemediating(true);
+    try {
+      await fetch('/remediation/api/v1/remediation/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: "Déclenchement live via Dashboard Démo" }),
+      });
+      await fetch('/api/v1/chaos/reset', { method: 'POST' });
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRemediating(false);
+    }
+  };
+
+  const handleClearLogs = async () => {
+    try {
+      await fetch('/remediation/api/v1/remediation/logs', { method: 'DELETE' });
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#080C15] text-slate-100 p-4 md:p-8">
-      {/* Header & Bandeau Statut */}
-      <header className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
-        <div>
+    <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col font-sans">
+      {/* Barre de Navigation Principale */}
+      <header className="border-b border-slate-800 bg-[#0B0F1A]/90 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 py-3.5">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+          {/* Logo & Identité */}
           <div className="flex items-center gap-3">
-            <span className="p-2 bg-indigo-600/20 text-indigo-400 rounded-lg border border-indigo-500/30">
-              <ShieldCheck className="w-6 h-6" />
-            </span>
+            <div className="p-2 bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white rounded-xl shadow-lg shadow-indigo-600/30">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                PROJECT RESILIENCE-ALPHA
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded bg-indigo-900/60 text-indigo-300 border border-indigo-700/50">
-                  K8s Cluster Ready
+              <span className="font-extrabold tracking-wider text-base text-white flex items-center gap-2">
+                RESILIENCE PAY
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700/60 uppercase">
+                  Zero-Touch
                 </span>
-              </h1>
-              <p className="text-xs text-slate-400">Plateforme de paiement cyber-résiliente & Supervision Zero-Touch</p>
+              </span>
+              <p className="text-[11px] text-slate-400">Terminal Bancaire Fictif & Cyber-Résilience</p>
             </div>
           </div>
-        </div>
 
-        {/* Pilules de statut */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs">
-            <span className="text-slate-400">Transactions :</span>
-            <span className="font-semibold text-white">{totalTx}</span>
+          {/* Onglets de Navigation Switch */}
+          <div className="flex items-center gap-2 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+            <button
+              onClick={() => setActiveTab('payment')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'payment'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>Terminal de Paiement</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('supervision')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'supervision'
+                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Activity className="w-4 h-4" />
+              <span>Centre de Supervision</span>
+              {chaosState.is_active && (
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              )}
+            </button>
           </div>
 
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-xs">
-            <span className="text-slate-400">Uptime :</span>
-            <span className="font-semibold text-white">{Math.round(uptime)}s</span>
+          {/* Pastille de Santé Rapide */}
+          <div className="hidden lg:flex items-center gap-2 text-xs font-mono">
+            {healthStatus === 'HEALTHY' ? (
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                ONLINE (200 OK)
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/30 text-rose-400">
+                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+                INCIDENT EN COURS
+              </span>
+            )}
           </div>
-
-          {healthStatus === 'HEALTHY' && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              SYSTÈME OPÉRATIONNEL
-            </div>
-          )}
-
-          {healthStatus !== 'HEALTHY' && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
-              PERTURBATION DÉTECTÉE
-            </div>
-          )}
-
-          {chaosState.is_active && (
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              CHAOS ACTIF (Latence {chaosState.injected_latency_ms}ms)
-            </div>
-          )}
         </div>
       </header>
 
-      {/* Grille Principale */}
-      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Colonne Gauche : Terminal de Paiement (7 colonnes) */}
-        <section className="lg:col-span-7 space-y-6">
-          <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-indigo-400" />
-                Terminal de Paiement Sécurisé (Fictif)
-              </h2>
-              <span className="text-xs text-slate-400 flex items-center gap-1">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" /> Sandbox Bancaire
-              </span>
-            </div>
+      {/* ========================================================================= */}
+      {/* VUE 1 : PAGE CARTE DE PAIEMENT DÉDIÉE (ÉPURÉE, FLUIDE, PROFESSIONNELLE) */}
+      {/* ========================================================================= */}
+      {activeTab === 'payment' && (
+        <main className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8 flex flex-col justify-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Colonne Gauche : Récapitulatif Commande & Rendu Carte Virtuelle (5 cols) */}
+            <div className="lg:col-span-5 space-y-6">
+              {/* Carte Bancaire Virtuelle Réaliste */}
+              <div className={`relative overflow-hidden w-full h-56 rounded-2xl bg-gradient-to-tr ${cardBrand.color} p-6 shadow-2xl text-white border border-white/10 transition-all duration-500 transform hover:scale-[1.02]`}>
+                {/* Reflet Holographique */}
+                <div className="absolute -top-16 -right-16 w-48 h-48 bg-white/5 rounded-full blur-xl pointer-events-none" />
 
-            {/* Carte Bancaire Virtuelle Stylée */}
-            <div className="relative overflow-hidden w-full h-48 rounded-xl bg-gradient-to-tr from-indigo-900 via-indigo-700 to-slate-800 p-5 shadow-2xl mb-6 text-white border border-indigo-400/20">
-              <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-9 bg-amber-300/80 rounded-md border border-amber-200/50 shadow-inner flex items-center justify-center">
-                  <div className="w-8 h-5 border border-amber-600/40 rounded-sm" />
-                </div>
-                <span className="text-lg font-extrabold tracking-widest text-indigo-200">RESILIENCE PAY</span>
-              </div>
-              <div className="text-lg md:text-xl font-mono tracking-widest mb-4">
-                {cardNumber || '•••• •••• •••• ••••'}
-              </div>
-              <div className="flex justify-between items-end text-xs uppercase tracking-wider text-slate-200">
-                <div>
-                  <span className="block text-[10px] text-indigo-200">Titulaire</span>
-                  <span className="font-semibold">{customerName || 'NOM DU CLIENT'}</span>
-                </div>
-                <div>
-                  <span className="block text-[10px] text-indigo-200">Expire</span>
-                  <span className="font-semibold">{cardExpiry || 'MM/AA'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Formulaire de paiement */}
-            <form onSubmit={handlePayment} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Montant à régler (€)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    required
-                    className="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Devise</label>
-                  <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="EUR">EUR (€)</option>
-                    <option value="USD">USD ($)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Nom complet du porteur</label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  required
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Numéro de Carte (Fictif)</label>
-                  <input
-                    type="text"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    required
-                    className="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">CVV</label>
-                  <input
-                    type="text"
-                    maxLength={4}
-                    value={cardCvv}
-                    onChange={(e) => setCardCvv(e.target.value)}
-                    className="w-full bg-slate-900/90 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              {/* Bouton d'action de paiement */}
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    Traitement de l'autorisation...
-                  </>
-                ) : (
-                  <>
-                    <span>Effectuer le paiement de {amount} {currency}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-
-            {/* Notification de Résultat Succès */}
-            {lastPaymentResult && (
-              <div className="mt-5 p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-200 flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 mt-0.5 shrink-0" />
-                <div className="text-xs space-y-1">
-                  <div className="font-bold text-sm text-emerald-300">Transaction Autorisée avec Succès !</div>
-                  <div>Réf : <span className="font-mono text-white">{lastPaymentResult.reference}</span></div>
-                  <div>ID : <span className="font-mono text-slate-300">{lastPaymentResult.transaction_id}</span></div>
-                  <div>Code Auth : <span className="font-mono text-emerald-300 font-semibold">{lastPaymentResult.auth_code}</span></div>
-                </div>
-              </div>
-            )}
-
-            {/* Notification d'Échec */}
-            {paymentError && (
-              <div className="mt-5 p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-200 flex items-start gap-3">
-                <XCircle className="w-5 h-5 text-rose-400 mt-0.5 shrink-0" />
-                <div className="text-xs space-y-1">
-                  <div className="font-bold text-sm text-rose-300">Échec de la transaction</div>
-                  <div>{paymentError}</div>
-                  <div className="text-slate-400">Le système est actuellement instable ou en cours de remédiation autonome.</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Colonne Droite : Supervision & Actions Démo (5 colonnes) */}
-        <section className="lg:col-span-5 space-y-6">
-          {/* Panneau d'Actions Rapides & Chaos (Idéal pour la Démo) */}
-          <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-              <Zap className="w-5 h-5 text-amber-400" />
-              Commandes de Démonstration Live
-            </h2>
-
-            <div className="space-y-3">
-              <button
-                onClick={handleSimulateBatch}
-                disabled={isRefreshing}
-                className="w-full text-left px-4 py-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 transition flex items-center justify-between"
-              >
-                <div>
-                  <div className="text-xs font-semibold text-white">⚡ Générer 10 transactions de trafic</div>
-                  <div className="text-[11px] text-slate-400">Alimente les métriques Prometheus et le modèle ML</div>
-                </div>
-                <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
-              </button>
-
-              <button
-                onClick={handleTriggerChaos}
-                className="w-full text-left px-4 py-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/40 border border-rose-700/50 transition flex items-center justify-between"
-              >
-                <div>
-                  <div className="text-xs font-semibold text-rose-300">💥 Simuler Attaque (Latence + Erreurs 500)</div>
-                  <div className="text-[11px] text-rose-400/80">Provoque l'anomalie détectée par le modèle ML</div>
-                </div>
-                <AlertTriangle className="w-4 h-4 text-rose-400" />
-              </button>
-
-              <button
-                onClick={handleResetChaos}
-                className="w-full text-left px-4 py-3 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-700/50 transition flex items-center justify-between"
-              >
-                <div>
-                  <div className="text-xs font-semibold text-emerald-300">🔄 Réinitialiser à l'état nominal</div>
-                  <div className="text-[11px] text-emerald-400/80">Rétablit les paramètres sans latence ni erreur</div>
-                </div>
-                <RefreshCw className="w-4 h-4 text-emerald-400" />
-              </button>
-            </div>
-          </div>
-
-          {/* Flux des Dernières Transactions en direct */}
-          <div className="bg-[#101726] border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-              <Activity className="w-5 h-5 text-indigo-400" />
-              Dernières Transactions (Temps Réel)
-            </h2>
-
-            {transactions.length === 0 ? (
-              <p className="text-xs text-slate-500 py-4 text-center">Aucune transaction enregistrée pour l'instant.</p>
-            ) : (
-              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                {transactions.map((tx) => (
-                  <div
-                    key={tx.transaction_id}
-                    className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-200">{tx.customer_name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Carte **** {tx.card_last4}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-bold text-white">{tx.amount.toFixed(2)} {tx.currency}</div>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                        {tx.status}
-                      </span>
+                <div className="flex justify-between items-start mb-6">
+                  {/* Puce Électronique Réaliste */}
+                  <div className="w-12 h-9 bg-gradient-to-br from-amber-200 via-amber-400 to-amber-500 rounded-md border border-amber-300 shadow-md flex items-center justify-center p-1">
+                    <div className="w-full h-full border border-amber-700/40 rounded-sm grid grid-cols-2 gap-0.5 opacity-60">
+                      <div className="border-r border-amber-700/40" />
+                      <div />
                     </div>
                   </div>
-                ))}
+                  <div className="text-right">
+                    <span className="text-sm font-black tracking-widest text-slate-200">{cardBrand.name}</span>
+                    <span className="block text-[9px] text-slate-400 font-mono tracking-wider">RESILIENCE-SECURE</span>
+                  </div>
+                </div>
+
+                {/* Numéro avec espaces tous les 4 chiffres */}
+                <div className="text-xl md:text-2xl font-mono tracking-widest mb-6 font-semibold drop-shadow-md">
+                  {cardNumber || '•••• •••• •••• ••••'}
+                </div>
+
+                <div className="flex justify-between items-end text-xs uppercase tracking-wider text-slate-200">
+                  <div>
+                    <span className="block text-[9px] text-slate-400 font-medium">Titulaire</span>
+                    <span className="font-semibold text-white tracking-wide">{customerName || 'NOM DU CLIENT'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[9px] text-slate-400 font-medium">Expire Fin</span>
+                    <span className="font-semibold text-white tracking-wide">{cardExpiry || 'MM/AA'}</span>
+                  </div>
+                </div>
               </div>
-            )}
+
+              {/* Récapitulatif du panier fictif */}
+              <div className="bg-[#0F1626] border border-slate-800 rounded-2xl p-5 space-y-3">
+                <div className="flex items-center justify-between text-xs text-slate-400 pb-3 border-b border-slate-800">
+                  <span className="flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-indigo-400" />
+                    Panier Sécurisé
+                  </span>
+                  <span className="font-mono text-slate-300">#RES-2026-ALPHA</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-slate-300">Pack Sûreté Numérique (Fictif)</span>
+                  <span className="font-bold text-white font-mono">{amount} {currency}</span>
+                </div>
+                <div className="text-[11px] text-slate-400 pt-2 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Environnement bac à sable — Aucune donnée bancaire réelle requise.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Colonne Droite : Formulaire avec Inputs Intelligents (7 cols) */}
+            <div className="lg:col-span-7 bg-[#0F1626] border border-slate-800 rounded-2xl p-6 md:p-8 shadow-xl">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span>Informations de Paiement</span>
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">Saisissez les coordonnées de votre carte de test ci-dessous.</p>
+              </div>
+
+              <form onSubmit={handlePayment} className="space-y-4">
+                {/* Montant et Devise */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Montant à payer</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="1"
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        required
+                        className="w-full bg-[#080C15] border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">{currency}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Presets</label>
+                    <div className="flex gap-1.5">
+                      {['15', '49.99', '120'].map((p) => (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setAmount(p)}
+                          className={`flex-1 py-2 text-xs rounded-lg border font-mono transition ${
+                            amount === p
+                              ? 'bg-indigo-600/30 border-indigo-500 text-indigo-300 font-bold'
+                              : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {p}€
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Nom du titulaire */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Nom du Titulaire</label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={handleNameChange}
+                    required
+                    placeholder="JEAN DUPONT"
+                    className="w-full bg-[#080C15] border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white uppercase tracking-wider focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+
+                {/* Numéro de carte avec espaces automatiques et chiffres uniquement */}
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="text-xs font-semibold text-slate-300">Numéro de Carte Bancaire</label>
+                    <span className="text-[10px] text-indigo-400 font-semibold">{cardBrand.name}</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={cardNumber}
+                      onChange={handleCardNumberChange}
+                      required
+                      placeholder="4532 0000 0000 0000"
+                      maxLength={19}
+                      className="w-full bg-[#080C15] border border-slate-700 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white font-mono tracking-widest focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    />
+                    <CreditCard className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">Espaces insérés automatiquement. Uniquement des chiffres acceptés.</p>
+                </div>
+
+                {/* Date d'expiration et CVV */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Date d'Expiration</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={cardExpiry}
+                      onChange={handleExpiryChange}
+                      required
+                      placeholder="MM/AA"
+                      maxLength={5}
+                      className="w-full bg-[#080C15] border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono tracking-widest text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-300 mb-1">Code CVV</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={cardCvv}
+                        onChange={handleCvvChange}
+                        required
+                        placeholder="123"
+                        maxLength={4}
+                        className="w-full bg-[#080C15] border border-slate-700 rounded-xl pl-9 pr-3.5 py-2.5 text-sm text-white font-mono tracking-widest text-center focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                      <Lock className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-3" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bouton de confirmation de paiement */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full mt-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-600/30 transition-all flex items-center justify-center gap-2 text-sm tracking-wide"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Autorisation bancaire en cours...
+                    </>
+                  ) : (
+                    <>
+                      <span>Payer {amount} {currency}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Récépissé en cas de SUCCÈS */}
+              {lastPaymentResult && (
+                <div className="mt-6 p-4 rounded-xl bg-emerald-950/70 border border-emerald-500/50 text-emerald-200 animate-fadeIn">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1 w-full">
+                      <div className="font-bold text-sm text-emerald-300 flex justify-between items-center">
+                        <span>Paiement Validé avec Succès !</span>
+                        <span className="font-mono text-[11px] bg-emerald-900/80 px-2 py-0.5 rounded text-emerald-200">
+                          {lastPaymentResult.status}
+                        </span>
+                      </div>
+                      <div className="text-slate-300">
+                        Référence : <span className="font-mono text-white font-semibold">{lastPaymentResult.reference}</span>
+                      </div>
+                      <div className="text-slate-300">
+                        Code d'Autorisation : <span className="font-mono text-emerald-300 font-bold">{lastPaymentResult.auth_code}</span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 pt-1">
+                        Transaction ID : <span className="font-mono">{lastPaymentResult.transaction_id}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Message d'Erreur lors d'une Panne ou Attaque */}
+              {paymentError && (
+                <div className="mt-6 p-4 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-200 animate-fadeIn">
+                  <div className="flex items-start gap-3">
+                    <XCircle className="w-6 h-6 text-rose-400 shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1">
+                      <div className="font-bold text-sm text-rose-300">Échec de la Transaction</div>
+                      <div>{paymentError}</div>
+                      <p className="text-slate-400 text-[11px] pt-1">
+                        Le système bancaire est actuellement perturbé. Basculez sur l'onglet **Centre de Supervision** pour déclencher ou observer la remédiation autonome.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </section>
-      </main>
+        </main>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VUE 2 : CENTRE DE SUPERVISION & CYBER-RÉSILIENCE (SOC, LOGS, CHAOS)      */}
+      {/* ========================================================================= */}
+      {activeTab === 'supervision' && (
+        <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
+          {/* Bandeau de Chiffres Clés */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-[#0F1626] border border-slate-800 rounded-xl p-4">
+              <span className="text-xs text-slate-400 block mb-1">Disponibilité Système</span>
+              <span className={`text-lg font-bold font-mono ${healthStatus === 'HEALTHY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {healthStatus}
+              </span>
+            </div>
+            <div className="bg-[#0F1626] border border-slate-800 rounded-xl p-4">
+              <span className="text-xs text-slate-400 block mb-1">Temps de Fonctionnement</span>
+              <span className="text-lg font-bold font-mono text-white">{Math.round(uptime)}s</span>
+            </div>
+            <div className="bg-[#0F1626] border border-slate-800 rounded-xl p-4">
+              <span className="text-xs text-slate-400 block mb-1">Transactions Enregistrées</span>
+              <span className="text-lg font-bold font-mono text-indigo-400">{totalTx}</span>
+            </div>
+            <div className="bg-[#0F1626] border border-slate-800 rounded-xl p-4">
+              <span className="text-xs text-slate-400 block mb-1">Événements de Remédiation</span>
+              <span className="text-lg font-bold font-mono text-amber-400">{remediationHistory.length}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            {/* Colonne Gauche : Panneau de Contrôle & Démo Live (5 cols) */}
+            <div className="lg:col-span-5 space-y-6">
+              <div className="bg-[#0F1626] border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+                  <Zap className="w-5 h-5 text-amber-400" />
+                  Commandes de Démonstration Live
+                </h2>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleSimulateBatch}
+                    disabled={isRefreshing}
+                    className="w-full text-left px-4 py-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-700/80 transition flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-white">⚡ Générer 10 transactions de trafic</div>
+                      <div className="text-[11px] text-slate-400">Alimente les métriques Prometheus et le modèle ML</div>
+                    </div>
+                    <RefreshCw className={`w-4 h-4 text-slate-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+
+                  <button
+                    onClick={handleTriggerChaos}
+                    className="w-full text-left px-4 py-3 rounded-xl bg-rose-950/40 hover:bg-rose-900/40 border border-rose-700/50 transition flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-rose-300">💥 Simuler Attaque (Latence + Erreurs 500)</div>
+                      <div className="text-[11px] text-rose-400/80">Provoque l'anomalie détectée par le modèle ML</div>
+                    </div>
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  </button>
+
+                  <button
+                    onClick={handleTriggerRemediation}
+                    disabled={isRemediating}
+                    className="w-full text-left px-4 py-3 rounded-xl bg-indigo-950/40 hover:bg-indigo-900/40 border border-indigo-700/50 transition flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-indigo-300">🛡️ Déclencher Remédiation Autonome</div>
+                      <div className="text-[11px] text-indigo-400/80">Rollout restart K8s + Preuve par transaction test</div>
+                    </div>
+                    <Play className={`w-4 h-4 text-indigo-400 ${isRemediating ? 'animate-spin' : ''}`} />
+                  </button>
+
+                  <button
+                    onClick={handleResetChaos}
+                    className="w-full text-left px-4 py-3 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/40 border border-emerald-700/50 transition flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="text-xs font-semibold text-emerald-300">🔄 Réinitialiser à l'état nominal</div>
+                      <div className="text-[11px] text-emerald-400/80">Rétablit les paramètres sans latence ni erreur</div>
+                    </div>
+                    <RefreshCw className="w-4 h-4 text-emerald-400" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Flux des Dernières Transactions */}
+              <div className="bg-[#0F1626] border border-slate-800 rounded-2xl p-6 shadow-xl">
+                <h2 className="text-base font-bold text-white flex items-center gap-2 mb-4">
+                  <Activity className="w-5 h-5 text-indigo-400" />
+                  Dernières Transactions (Temps Réel)
+                </h2>
+
+                {transactions.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-4 text-center">Aucune transaction enregistrée.</p>
+                ) : (
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {transactions.map((tx) => (
+                      <div
+                        key={tx.transaction_id}
+                        className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 flex items-center justify-between text-xs"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-200">{tx.customer_name}</div>
+                          <div className="text-[10px] text-slate-500 font-mono">Carte **** {tx.card_last4}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-bold text-white">{tx.amount.toFixed(2)} {tx.currency}</div>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                            {tx.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Colonne Droite : Console de Logs et d'Audit de Remédiation (7 cols) */}
+            <div className="lg:col-span-7 bg-[#0F1626] border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-emerald-400" />
+                  <h3 className="text-base font-bold text-white uppercase tracking-wide">
+                    Console de Remédiation & Audit Zero-Touch
+                  </h3>
+                </div>
+                <button
+                  onClick={handleClearLogs}
+                  title="Vider les logs"
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Écran Terminal Noir avec Défilement */}
+              <div className="bg-[#050811] rounded-xl border border-slate-800 p-4 font-mono text-xs max-h-96 overflow-y-auto space-y-2 shadow-inner">
+                {remediationLogs.length === 0 ? (
+                  <div className="text-slate-500 text-center py-8">
+                    En attente d'événements... Les sondes Kubernetes et le récepteur ML sont opérationnels.
+                  </div>
+                ) : (
+                  remediationLogs.map((log, index) => {
+                    let badgeClass = "bg-slate-800 text-slate-300";
+                    if (log.level === "ALERT") badgeClass = "bg-rose-950 text-rose-300 border border-rose-800";
+                    if (log.level === "ACTION") badgeClass = "bg-indigo-950 text-indigo-300 border border-indigo-800";
+                    if (log.level === "VERIFY") badgeClass = "bg-amber-950 text-amber-300 border border-amber-800";
+                    if (log.level === "SUCCESS") badgeClass = "bg-emerald-950 text-emerald-300 border border-emerald-700 font-bold";
+                    if (log.level === "ERROR") badgeClass = "bg-red-900 text-white font-bold";
+
+                    return (
+                      <div key={index} className="flex items-start gap-2.5 leading-relaxed hover:bg-slate-900/60 p-1.5 rounded">
+                        <span className="text-slate-500 select-none text-[11px]">[{log.time}]</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-semibold shrink-0 ${badgeClass}`}>
+                          {log.level}
+                        </span>
+                        <span className={`text-[12px] break-all ${log.level === "SUCCESS" ? "text-emerald-300 font-semibold" : log.level === "ALERT" ? "text-rose-300" : "text-slate-300"}`}>
+                          {log.message}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
     </div>
   );
 }
