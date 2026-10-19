@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payment-api-netpol
+  namespace: resilience-alpha
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-api
+  policyTypes:
+    - Ingress
+  ingress:
+    # Autorise uniquement le trafic provenant du dashboard frontend et des sondes internes
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dashboard-ui
+      ports:
+        - protocol: TCP
+          port: 8000

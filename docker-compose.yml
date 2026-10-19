@@ -1,0 +1,30 @@
+services:
+  payment-api:
+    build:
+      context: ./services/payment-api
+      dockerfile: Dockerfile
+    container_name: resilience-payment-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=payment-api
+      - PORT=8000
+      - DB_PATH=/app/data/payments.db
+    volumes:
+      - payment_data:/app/data
+    networks:
+      - resilience-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8000/health').getcode() == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+networks:
+  resilience-net:
+    driver: bridge
+
+volumes:
+  payment_data:
