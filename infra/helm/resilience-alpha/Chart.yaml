@@ -1,0 +1,9 @@
+apiVersion: v2
+name: resilience-alpha
+description: Helm Chart pour le déploiement Kubernetes de PROJECT RESILIENCE-ALPHA (Plateforme de paiement cyber-résiliente)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Consortium Resilience-Alpha
+    email: dev@resilience.local

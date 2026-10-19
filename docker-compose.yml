@@ -22,6 +22,39 @@ services:
       retries: 3
       start_period: 5s
 
+  remediation-engine:
+    build:
+      context: ./services/remediation-engine
+      dockerfile: Dockerfile
+    container_name: resilience-remediation-engine
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - SERVICE_NAME=remediation-engine
+      - PORT=8001
+      - PAYMENT_API_URL=http://resilience-payment-api:8000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - resilience-net
+    depends_on:
+      payment-api:
+        condition: service_healthy
+
+  dashboard-ui:
+    build:
+      context: ./services/dashboard-ui
+      dockerfile: Dockerfile
+    container_name: resilience-dashboard-ui
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - resilience-net
+    depends_on:
+      - payment-api
+
 networks:
   resilience-net:
     driver: bridge

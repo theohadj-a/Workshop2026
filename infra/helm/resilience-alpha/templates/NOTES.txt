@@ -1,0 +1,20 @@
+Merci d'avoir déployé {{ .Chart.Name }} !
+
+La plateforme de cyber-résilience PROJECT RESILIENCE-ALPHA est en cours de déploiement dans le namespace: {{ .Values.global.namespace }}.
+
+1. Vérifier l'état des pods et des réplicas :
+   kubectl get pods -n {{ .Values.global.namespace }} -o wide
+
+2. Accéder au Dashboard de paiement (React) :
+   http://localhost:{{ .Values.dashboardUi.service.nodePort }}
+
+3. Accéder à l'API de Paiement :
+   kubectl port-forward -n {{ .Values.global.namespace }} svc/payment-api-service 8000:{{ .Values.paymentApi.service.port }}
+   Puis ouvrir : http://localhost:8000/docs
+
+4. Accéder au Moteur de Remédiation :
+   kubectl port-forward -n {{ .Values.global.namespace }} svc/remediation-service 8001:{{ .Values.remediationEngine.service.port }}
+   Puis ouvrir : http://localhost:8001/health
+
+5. Vérifier l'Auto-scaling (HPA) :
+   kubectl get hpa -n {{ .Values.global.namespace }}

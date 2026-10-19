@@ -1,0 +1,26 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payment-api-netpol
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: payment-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dashboard-ui
+        - podSelector:
+            matchLabels:
+              app: remediation-engine
+      ports:
+        - protocol: TCP
+          port: {{ .Values.paymentApi.service.port }}
+{{- end }}

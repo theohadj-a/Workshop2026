@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: remediation-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: remediation-engine
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.remediationEngine.service.type }}
+  ports:
+    - port: {{ .Values.remediationEngine.service.port }}
+      targetPort: {{ .Values.remediationEngine.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: remediation-engine

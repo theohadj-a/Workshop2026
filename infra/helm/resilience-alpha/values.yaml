@@ -1,0 +1,85 @@
+# Default values for resilience-alpha Helm Chart.
+# Ce fichier permet de paramétrer tous les composants du cluster sans toucher aux manifestes.
+
+global:
+  namespace: resilience-alpha
+
+# 1. API de Paiement Métier (Microservice)
+paymentApi:
+  replicaCount: 3
+  image:
+    repository: payment-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  env:
+    serviceName: payment-api
+    port: 8000
+    dbPath: /app/data/payments.db
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  livenessProbe:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readinessProbe:
+    path: /health
+    initialDelaySeconds: 3
+    periodSeconds: 5
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+
+# 2. Interface Dashboard & Terminal de Paiement (React)
+dashboardUi:
+  replicaCount: 2
+  image:
+    repository: dashboard-ui
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 80
+    nodePort: 30080
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# 3. Moteur de Remédiation Autonome (Zero-Touch)
+remediationEngine:
+  replicaCount: 1
+  image:
+    repository: remediation-engine
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8001
+  env:
+    serviceName: remediation-engine
+    port: 8001
+    paymentApiUrl: http://payment-api-service:8000
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# 4. Politiques de Cybersécurité
+networkPolicy:
+  enabled: true

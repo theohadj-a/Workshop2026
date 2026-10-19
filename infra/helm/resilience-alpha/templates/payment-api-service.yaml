@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-api-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: payment-api
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.paymentApi.service.type }}
+  ports:
+    - port: {{ .Values.paymentApi.service.port }}
+      targetPort: {{ .Values.paymentApi.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: payment-api

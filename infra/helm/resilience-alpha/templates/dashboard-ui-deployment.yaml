@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-ui
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: dashboard-ui
+    tier: frontend
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.dashboardUi.replicaCount }}
+  selector:
+    matchLabels:
+      app: dashboard-ui
+  template:
+    metadata:
+      labels:
+        app: dashboard-ui
+        tier: frontend
+    spec:
+      containers:
+        - name: dashboard-ui
+          image: "{{ .Values.dashboardUi.image.repository }}:{{ .Values.dashboardUi.image.tag }}"
+          imagePullPolicy: {{ .Values.dashboardUi.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.dashboardUi.service.port }}
+              name: http
+          resources:
+            {{- toYaml .Values.dashboardUi.resources | nindent 12 }}
