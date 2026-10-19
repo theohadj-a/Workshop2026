@@ -54,11 +54,33 @@ async def lifespan(app: FastAPI):
     yield
     task.cancel()
 
+REMEDIATION_DESCRIPTION = """
+### 🤖 Moteur de Remédiation Autonome (Zero-Touch Recovery)
+
+Ce service assure le rétablissement automatique de la plateforme sans intervention humaine :
+1. **Surveillance native K8s** : Détection et purge automatique des pods en état critique (`CrashLoopBackOff`, `Error`, etc.).
+2. **Réception des alertes ML** : Webhook déclenchant un `rollout restart` lors d'une dégradation statistique.
+3. **Preuve par la transaction** : Rejeu automatique d'un paiement réel post-reprise pour certifier le retour nominal au jury.
+
+---
+
+### 🌐 Navigation dans l'Écosystème
+- 💳 **[Terminal de Paiement & Dashboard Web (React)](http://localhost:3000)** — Interface visuelle et commandes de démo en direct.
+- ⚙️ **[API de Paiement (Swagger)](http://localhost:8000/docs)** — Endpoints bancaires, healthchecks et injection de chaos.
+- 🩺 **[Sonde Healthcheck Remédiation](/health)** — Statut du moteur et connectivité avec le cluster.
+- 📜 **[Historique des Remédiations](/api/v1/remediation/history)** — Journal d'audit de toutes les reprises autonomes.
+- 🐙 **[Dépôt GitHub Officiel](https://github.com/theohadj-a/Workshop2026)** — Sources, Helm Chart, manifestes K8s et documentation.
+
+---
+"""
+
 app = FastAPI(
     title="PROJECT RESILIENCE-ALPHA — Remediation Engine",
-    description="Moteur de remediation autonome (Zero-Touch Recovery) connecte a Kubernetes et au detecteur ML.",
+    description=REMEDIATION_DESCRIPTION,
     version=settings.version,
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 app.add_middleware(

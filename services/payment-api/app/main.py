@@ -15,9 +15,26 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
+API_DESCRIPTION = """
+### 🛡️ Plateforme de Paiement Cyber-Résiliente & Observabilité
+
+Ce microservice traite les transactions bancaires fictives du consortium **RESILIENCE-ALPHA**, expose les métriques d'exploitation au format Prometheus et intègre des modules de chaos engineering.
+
+---
+
+### 🌐 Navigation dans l'Écosystème
+- 💳 **[Terminal de Paiement & Dashboard Web (React)](http://localhost:3000)** — Interface visuelle avec carte bancaire interactive, bandeau de statut en direct et commandes de démo.
+- 🤖 **[Moteur de Remédiation Autonome (Swagger)](http://localhost:8001/docs)** — Service de reprise Zero-Touch connecté à Kubernetes et au modèle ML.
+- 📊 **[Métriques Prometheus en direct](/metrics)** — Métriques système et métier analysées par l'agent AIOps.
+- 🩺 **[Sonde de Contrôle de Santé (Healthcheck)](/health)** — Contrôle de disponibilité utilisé par Docker, K8s et le moteur de remédiation.
+- 🐙 **[Dépôt GitHub Officiel](https://github.com/theohadj-a/Workshop2026)** — Sources, Helm Chart, manifestes K8s et documentation.
+
+---
+"""
+
 app = FastAPI(
     title="PROJECT RESILIENCE-ALPHA — Payment API",
-    description="Microservice de paiement fictif conteneurisé et instrumenté pour l'observabilité et la cyber-résilience.",
+    description=API_DESCRIPTION,
     version=settings.version,
     lifespan=lifespan,
     docs_url="/docs",
