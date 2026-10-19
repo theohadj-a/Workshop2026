@@ -8,6 +8,7 @@ set -e
 
 TAG="latest"
 SERVICE="all"
+PLATFORM="linux/arm64,linux/amd64"
 NO_CACHE=""
 
 # Couleurs
@@ -27,6 +28,10 @@ while [[ $# -gt 0 ]]; do
       SERVICE="$2"
       shift 2
       ;;
+    --platform|-p)
+      PLATFORM="$2"
+      shift 2
+      ;;
     --no-cache)
       NO_CACHE="--no-cache"
       shift
@@ -40,7 +45,7 @@ done
 
 echo -e "${CYAN}==========================================================${NC}"
 echo -e "${CYAN}  PROJECT RESILIENCE-ALPHA — DOCKER IMAGE BUILDER         ${NC}"
-echo -e "${CYAN}  Tag cible : $TAG | Service : $SERVICE                   ${NC}"
+echo -e "${CYAN}  Tag : $TAG | Service : $SERVICE | Platform : $PLATFORM  ${NC}"
 echo -e "${CYAN}==========================================================${NC}"
 
 # Vérifier Docker
@@ -55,10 +60,10 @@ build_image() {
   local full_tag="${name}:${TAG}"
 
   echo -e "\n${YELLOW}----------------------------------------------------------${NC}"
-  echo -e "${CYAN}[INFO] Construction de l'image : ${full_tag} (${context})${NC}"
+  echo -e "${CYAN}[INFO] Construction de l'image : ${full_tag} (${context}) [${PLATFORM}]${NC}"
   
   start_time=$(date +%s)
-  docker build ${NO_CACHE} -t "${full_tag}" "${context}"
+  docker buildx build --platform "${PLATFORM}" ${NO_CACHE} -t "${full_tag}" --load "${context}"
   end_time=$(date +%s)
   duration=$((end_time - start_time))
 

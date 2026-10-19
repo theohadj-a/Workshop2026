@@ -1,6 +1,7 @@
 param (
     [string]$Tag = "latest",
     [string]$Service = "all",
+    [string]$Platform = "linux/arm64,linux/amd64",
     [switch]$NoCache = $false
 )
 
@@ -64,9 +65,9 @@ foreach ($s in $ServicesToBuild) {
     $ImageFull = "$($s.ImageName):$Tag"
     Write-Host ""
     Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
-    Log-Info "Demarrage du build : $ImageFull (Dossier : $($s.Context))"
+    Log-Info "Demarrage du build : $ImageFull (Dossier : $($s.Context), Plateformes : $Platform)"
     
-    $BuildArgs = @("build", "-t", $ImageFull, $s.Context)
+    $BuildArgs = @("buildx", "build", "--platform", $Platform, "-t", $ImageFull, "--load", $s.Context)
     if ($NoCache) {
         $BuildArgs += "--no-cache"
         Log-Warn "Option --no-cache activee."

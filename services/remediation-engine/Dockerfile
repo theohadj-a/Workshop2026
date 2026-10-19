@@ -6,9 +6,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Installation de curl pour telecharger kubectl
+# Installation de curl pour telecharger kubectl selon l'architecture (AMD64 ou ARM64 pour Mac Apple Silicon)
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
-    curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl" && \
+    ARCH=$(dpkg --print-architecture) && \
+    curl -LO "https://dl.k8s.io/release/v1.31.0/bin/linux/${ARCH}/kubectl" && \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/ && \
     apt-get purge -y --auto-remove curl && \

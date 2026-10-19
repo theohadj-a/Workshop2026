@@ -10,7 +10,7 @@ paymentApi:
   image:
     repository: payment-api
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Never
   service:
     type: ClusterIP
     port: 8000
@@ -45,7 +45,7 @@ dashboardUi:
   image:
     repository: dashboard-ui
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Never
   service:
     type: NodePort
     port: 80
@@ -64,7 +64,7 @@ remediationEngine:
   image:
     repository: remediation-engine
     tag: latest
-    pullPolicy: IfNotPresent
+    pullPolicy: Never
   service:
     type: ClusterIP
     port: 8001
