@@ -8,7 +8,7 @@ set -e
 
 TAG="latest"
 SERVICE="all"
-PLATFORM="linux/arm64,linux/amd64"
+PLATFORM="linux/arm64"
 NO_CACHE=""
 
 # Couleurs

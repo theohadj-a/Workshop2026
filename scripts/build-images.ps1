@@ -1,7 +1,7 @@
 param (
     [string]$Tag = "latest",
     [string]$Service = "all",
-    [string]$Platform = "linux/arm64,linux/amd64",
+    [string]$Platform = "linux/amd64",
     [switch]$NoCache = $false
 )
 
@@ -65,7 +65,7 @@ foreach ($s in $ServicesToBuild) {
     $ImageFull = "$($s.ImageName):$Tag"
     Write-Host ""
     Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
-    Log-Info "Demarrage du build : $ImageFull (Dossier : $($s.Context), Plateformes : $Platform)"
+    Log-Info "Demarrage du build : $ImageFull (Dossier : $($s.Context), Plateforme : $Platform)"
     
     $BuildArgs = @("buildx", "build", "--platform", $Platform, "-t", $ImageFull, "--load", $s.Context)
     if ($NoCache) {
