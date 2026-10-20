@@ -10,7 +10,7 @@ paymentApi:
   image:
     repository: payment-api
     tag: latest
-    pullPolicy: Never
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 8000
@@ -35,7 +35,7 @@ paymentApi:
     periodSeconds: 5
   autoscaling:
     enabled: true
-    minReplicas: 3
+    minReplicas: 1
     maxReplicas: 8
     targetCPUUtilizationPercentage: 70
 
@@ -45,7 +45,7 @@ dashboardUi:
   image:
     repository: dashboard-ui
     tag: latest
-    pullPolicy: Never
+    pullPolicy: IfNotPresent
   service:
     type: NodePort
     port: 80
@@ -64,7 +64,7 @@ remediationEngine:
   image:
     repository: remediation-engine
     tag: latest
-    pullPolicy: Never
+    pullPolicy: IfNotPresent
   service:
     type: ClusterIP
     port: 8001
@@ -86,7 +86,7 @@ aiopsDetector:
   image:
     repository: aiops-detector
     tag: latest
-    pullPolicy: Never
+    pullPolicy: IfNotPresent
   env:
     paymentApiUrl: http://payment-api-service:8000
     remediationWebhookUrl: http://remediation-service:8001/api/v1/remediation/alert

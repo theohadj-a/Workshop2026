@@ -4,6 +4,3 @@ description: Helm Chart pour le déploiement Kubernetes de PROJECT RESILIENCE-AL
 type: application
 version: 1.0.0
 appVersion: "1.0.0"
-maintainers:
-  - name: Consortium Resilience-Alpha
-    email: dev@resilience.local
