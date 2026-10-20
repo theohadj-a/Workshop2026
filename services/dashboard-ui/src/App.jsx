@@ -21,8 +21,22 @@ import {
 } from 'lucide-react';
 
 export default function App() {
-  // Navigation entre les vues
-  const [activeTab, setActiveTab] = useState('payment'); // 'payment' | 'supervision'
+  // Détection du chemin d'accès (route native sans bibliothèque externe)
+  // "/" ou tout chemin standard -> Terminal de paiement client épuré
+  // "/supervision" -> Centre de supervision SOC & Audit Zero-Touch
+  const [currentPath, setCurrentPath] = useState(
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  );
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const isSupervision = currentPath === '/supervision';
 
   // État du formulaire de paiement
   const [amount, setAmount] = useState('49.99');
@@ -266,76 +280,66 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#070A12] text-slate-100 flex flex-col font-sans">
-      {/* Barre de Navigation Principale */}
-      <header className="border-b border-slate-800 bg-[#0B0F1A]/90 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 py-3.5">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
-          {/* Logo & Identité */}
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white rounded-xl shadow-lg shadow-indigo-600/30">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-extrabold tracking-wider text-base text-white flex items-center gap-2">
-                RESILIENCE PAY
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700/60 uppercase">
-                  Zero-Touch
+      {/* Barre de navigation uniquement visible en mode /supervision */}
+      {isSupervision ? (
+        <header className="border-b border-slate-800 bg-[#0B0F1A]/90 backdrop-blur-md sticky top-0 z-50 px-4 md:px-8 py-3.5">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-3">
+            {/* Logo & Identité SOC */}
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-tr from-indigo-600 to-indigo-400 text-white rounded-xl shadow-lg shadow-indigo-600/30">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-extrabold tracking-wider text-base text-white flex items-center gap-2">
+                  RESILIENCE SOC
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700/60 uppercase">
+                    Supervision & Audit
+                  </span>
                 </span>
-              </span>
-              <p className="text-[11px] text-slate-400">Terminal Bancaire Fictif & Cyber-Résilience</p>
+                <p className="text-[11px] text-slate-400">Centre d'Opérations de Sécurité & Zero-Touch Recovery</p>
+              </div>
+            </div>
+
+            {/* Pastille de Santé Rapide */}
+            <div className="flex items-center gap-2 text-xs font-mono">
+              {healthStatus === 'HEALTHY' ? (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  CLUSTER ONLINE (200 OK)
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/30 text-rose-400">
+                  <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
+                  INCIDENT EN COURS
+                </span>
+              )}
             </div>
           </div>
-
-          {/* Onglets de Navigation Switch */}
-          <div className="flex items-center gap-2 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setActiveTab('payment')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'payment'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <CreditCard className="w-4 h-4" />
-              <span>Terminal de Paiement</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('supervision')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'supervision'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Activity className="w-4 h-4" />
-              <span>Centre de Supervision</span>
-              {chaosState.is_active && (
-                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              )}
-            </button>
-          </div>
-
-          {/* Pastille de Santé Rapide */}
-          <div className="hidden lg:flex items-center gap-2 text-xs font-mono">
-            {healthStatus === 'HEALTHY' ? (
-              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/30 text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                ONLINE (200 OK)
+        </header>
+      ) : (
+        /* En-tête épuré et sobre pour la page client du terminal de paiement */
+        <header className="border-b border-slate-800/60 bg-[#0B0F1A]/50 backdrop-blur-sm px-4 md:px-8 py-4">
+          <div className="max-w-5xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-indigo-600/30 text-indigo-400 border border-indigo-500/40 rounded-lg">
+                <Lock className="w-4 h-4" />
+              </div>
+              <span className="font-bold tracking-wide text-sm text-slate-200">
+                PAIEMENT SÉCURISÉ
               </span>
-            ) : (
-              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/80 border border-rose-500/30 text-rose-400">
-                <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />
-                INCIDENT EN COURS
-              </span>
-            )}
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              Chiffrement TLS 1.3
+            </span>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* ========================================================================= */}
-      {/* VUE 1 : PAGE CARTE DE PAIEMENT DÉDIÉE (ÉPURÉE, FLUIDE, PROFESSIONNELLE) */}
+      {/* VUE 1 : PAGE CARTE DE PAIEMENT CLIENT ÉPURÉE (ACCESSIBLE SUR "/")         */}
       {/* ========================================================================= */}
-      {activeTab === 'payment' && (
+      {!isSupervision && (
         <main className="flex-1 max-w-5xl mx-auto w-full p-4 md:p-8 flex flex-col justify-center">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             
@@ -569,7 +573,7 @@ export default function App() {
                       <div className="font-bold text-sm text-rose-300">Échec de la Transaction</div>
                       <div>{paymentError}</div>
                       <p className="text-slate-400 text-[11px] pt-1">
-                        Le système bancaire est actuellement perturbé. Basculez sur l'onglet **Centre de Supervision** pour déclencher ou observer la remédiation autonome.
+                        Le système de paiement bancaire rencontre une perturbation passagère. Veuillez patienter ou renouveler votre tentative dans quelques instants.
                       </p>
                     </div>
                   </div>
@@ -581,9 +585,9 @@ export default function App() {
       )}
 
       {/* ========================================================================= */}
-      {/* VUE 2 : CENTRE DE SUPERVISION & CYBER-RÉSILIENCE (SOC, LOGS, CHAOS)      */}
+      {/* VUE 2 : CENTRE DE SUPERVISION SOC & CYBER-RÉSILIENCE (SUR "/supervision") */}
       {/* ========================================================================= */}
-      {activeTab === 'supervision' && (
+      {isSupervision && (
         <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-8">
           {/* Bandeau de Chiffres Clés */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

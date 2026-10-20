@@ -48,7 +48,7 @@ dashboardUi:
     tag: latest
     pullPolicy: IfNotPresent
   service:
-    type: NodePort
+    type: LoadBalancer
     port: 80
     nodePort: 30080
   resources:
