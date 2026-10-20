@@ -68,7 +68,7 @@ async def k8s_native_watcher_loop():
                 remediation_history.insert(0, event)
 
                 add_log("VERIFY", "[HEALTHCHECK] Attente de la stabilisation des conteneurs...", event_id)
-                verification = verify_service_recovery(timeout_sec=15.0)
+                verification = await verify_service_recovery(timeout_sec=15.0)
                 event["status"] = "COMPLETED" if verification["success"] else "FAILED"
                 event["verification"] = verification
 
@@ -165,7 +165,7 @@ async def receive_ml_alert(payload: AnomalyAlertPayload, background_tasks: Backg
 
     # 2. Verification metier autonome (Preuve par la transaction)
     add_log("VERIFY", "[HEALTHCHECK] Attente de la disponibilite HTTP 200 sur le service de paiement...", event_id)
-    verification = verify_service_recovery(timeout_sec=20.0)
+    verification = await verify_service_recovery(timeout_sec=20.0)
     event["status"] = "COMPLETED" if verification["success"] else "FAILED"
     event["verification"] = verification
 
@@ -198,7 +198,7 @@ async def trigger_manual_remediation(payload: ManualTriggerPayload):
     k8s_manager.rollout_restart_deployment()
 
     add_log("VERIFY", "[HEALTHCHECK] Attente du retablissement du service...", event_id)
-    verification = verify_service_recovery(timeout_sec=20.0)
+    verification = await verify_service_recovery(timeout_sec=20.0)
     event["status"] = "COMPLETED" if verification["success"] else "FAILED"
     event["verification"] = verification
 

@@ -47,13 +47,18 @@ $ServicesToBuild = @(
         Name = "dashboard-ui"
         Context = "services/dashboard-ui"
         ImageName = "dashboard-ui"
+    },
+    @{
+        Name = "aiops-detector"
+        Context = "ai-ops/detector"
+        ImageName = "aiops-detector"
     }
 )
 
 if ($Service -ne "all") {
     $ServicesToBuild = $ServicesToBuild | Where-Object { $_.Name -eq $Service }
     if ($ServicesToBuild.Count -eq 0) {
-        Log-Error "Service inconnu : $Service. Options valides: all, payment-api, remediation-engine, dashboard-ui."
+        Log-Error "Service inconnu : $Service. Options valides: all, payment-api, remediation-engine, dashboard-ui, aiops-detector."
         exit 1
     }
 }
@@ -112,7 +117,7 @@ Write-Host "Duree totale du build : ${TotalDuration}s" -ForegroundColor Cyan
 Write-Host ""
 
 Log-Info "Images Docker locales disponibles :"
-docker images --filter "reference=payment-api" --filter "reference=remediation-engine" --filter "reference=dashboard-ui"
+docker images --filter "reference=payment-api" --filter "reference=remediation-engine" --filter "reference=dashboard-ui" --filter "reference=aiops-detector"
 
 Write-Host ""
 Log-Success "Build termine ! Deploiement possible via Docker Compose ou Helm."

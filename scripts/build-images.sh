@@ -82,7 +82,11 @@ if [[ "$SERVICE" == "all" || "$SERVICE" == "dashboard-ui" ]]; then
   build_image "dashboard-ui" "services/dashboard-ui"
 fi
 
+if [[ "$SERVICE" == "all" || "$SERVICE" == "aiops-detector" ]]; then
+  build_image "aiops-detector" "ai-ops/detector"
+fi
+
 echo -e "\n${GREEN}==========================================================${NC}"
 echo -e "${GREEN}  BUILD TERMINÉ AVEC SUCCÈS !                             ${NC}"
 echo -e "${GREEN}==========================================================${NC}"
-docker images | grep -E "payment-api|remediation-engine|dashboard-ui" | grep "${TAG}" || true
+docker images | grep -E "payment-api|remediation-engine|dashboard-ui|aiops-detector" | grep "${TAG}" || true

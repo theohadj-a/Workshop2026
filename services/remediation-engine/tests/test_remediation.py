@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -13,7 +13,7 @@ def test_health():
     assert data["status"] == "HEALTHY"
     assert "k8s_connected" in data
 
-@patch("app.main.verify_service_recovery")
+@patch("app.main.verify_service_recovery", new_callable=AsyncMock)
 @patch("app.main.k8s_manager.rollout_restart_deployment")
 def test_manual_trigger(mock_rollout, mock_verify):
     mock_rollout.return_value = True

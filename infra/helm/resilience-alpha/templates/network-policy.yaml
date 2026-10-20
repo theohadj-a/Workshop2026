@@ -20,6 +20,9 @@ spec:
         - podSelector:
             matchLabels:
               app: remediation-engine
+        - podSelector:
+            matchLabels:
+              app: aiops-detector
       ports:
         - protocol: TCP
           port: {{ .Values.paymentApi.service.port }}

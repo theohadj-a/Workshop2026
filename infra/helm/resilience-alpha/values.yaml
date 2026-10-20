@@ -80,6 +80,25 @@ remediationEngine:
       cpu: 200m
       memory: 128Mi
 
-# 4. Politiques de Cybersécurité
+# 4. Détecteur d'Anomalies AIOps (Machine Learning)
+aiopsDetector:
+  replicaCount: 1
+  image:
+    repository: aiops-detector
+    tag: latest
+    pullPolicy: Never
+  env:
+    paymentApiUrl: http://payment-api-service:8000
+    remediationWebhookUrl: http://remediation-service:8001/api/v1/remediation/alert
+    checkIntervalSec: 3.0
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# 5. Politiques de Cybersécurité
 networkPolicy:
   enabled: true

@@ -28,11 +28,16 @@ class AnomalyDetector:
         self.client = httpx.Client(timeout=2.0)
         self.consecutive_anomalies = 0
         self.last_alert_time = 0.0
+        self.prev_req_count = None
+        self.prev_error_count = None
+        self.prev_timestamp = None
 
     def extract_metrics(self) -> np.ndarray:
         """
         Extrait les signaux d'observabilite (soit depuis Prometheus, soit directement depuis /metrics).
+        Calcule un vrai taux par seconde (delta entre deux collectes).
         """
+        now = time.time()
         try:
             # Requete vers l'endpoint /metrics de l'API de paiement
             res = self.client.get(f"{PAYMENT_API_URL}/metrics")
@@ -41,7 +46,7 @@ class AnomalyDetector:
                 return np.array([[0.0, 5000.0, 1.0, 50.0]])
 
             text = res.text
-            # Parsing rapide des metriques Prometheus
+            # Parsing des metriques Prometheus
             req_count = 0.0
             error_count = 0.0
             active_req = 0.0
@@ -73,8 +78,22 @@ class AnomalyDetector:
 
             # Estimation de la latence moyenne en ms
             avg_latency_ms = (total_duration / total_duration_count * 1000.0) if total_duration_count > 0 else 25.0
-            error_rate = (error_count / req_count) if req_count > 0 else 0.0
-            request_rate = min(req_count, 50.0)  # Estimation instantanee
+
+            # Calcul du debit reel en req/s (delta)
+            if self.prev_timestamp is not None and self.prev_req_count is not None:
+                dt = max(now - self.prev_timestamp, 0.1)
+                delta_req = max(req_count - self.prev_req_count, 0.0)
+                delta_err = max(error_count - self.prev_error_count, 0.0)
+                request_rate = delta_req / dt
+                error_rate = (delta_err / delta_req) if delta_req > 0 else 0.0
+            else:
+                # Première passe (initialisation)
+                request_rate = 15.0  # Valeur nominale par défaut
+                error_rate = (error_count / req_count) if req_count > 0 else 0.0
+
+            self.prev_req_count = req_count
+            self.prev_error_count = error_count
+            self.prev_timestamp = now
 
             return np.array([[request_rate, avg_latency_ms, error_rate, active_req]])
 

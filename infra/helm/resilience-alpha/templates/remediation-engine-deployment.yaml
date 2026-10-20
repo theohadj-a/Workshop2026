@@ -37,3 +37,8 @@ spec:
               value: "{{ .Values.remediationEngine.env.paymentApiUrl }}"
           resources:
             {{- toYaml .Values.remediationEngine.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10002
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false

@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-detector
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: aiops-detector
+    tier: intelligence
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.aiopsDetector.replicaCount }}
+  selector:
+    matchLabels:
+      app: aiops-detector
+  template:
+    metadata:
+      labels:
+        app: aiops-detector
+        tier: intelligence
+    spec:
+      containers:
+        - name: aiops-detector
+          image: "{{ .Values.aiopsDetector.image.repository }}:{{ .Values.aiopsDetector.image.tag }}"
+          imagePullPolicy: {{ .Values.aiopsDetector.image.pullPolicy }}
+          env:
+            - name: PAYMENT_API_URL
+              value: "{{ .Values.aiopsDetector.env.paymentApiUrl }}"
+            - name: REMEDIATION_WEBHOOK_URL
+              value: "{{ .Values.aiopsDetector.env.remediationWebhookUrl }}"
+            - name: CHECK_INTERVAL_SEC
+              value: "{{ .Values.aiopsDetector.env.checkIntervalSec }}"
+          resources:
+            {{- toYaml .Values.aiopsDetector.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10003
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
