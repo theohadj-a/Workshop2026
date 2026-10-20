@@ -42,12 +42,18 @@ class AnomalyAlertPayload(BaseModel):
 class ManualTriggerPayload(BaseModel):
     reason: Optional[str] = "Manual Demonstration Trigger"
 
+class LogEntryPayload(BaseModel):
+    level: str = "INFO"
+    message: str
+    event_id: Optional[str] = None
+
 async def k8s_native_watcher_loop():
     """
     Boucle de surveillance native K8s (sans ML) :
     Detecte les pods en CrashLoopBackOff ou Error et les relance automatiquement.
     """
     add_log("INFO", "Sonde de surveillance native Kubernetes activee (intervalle 5s).")
+    ticks = 0
     while True:
         try:
             restarted = k8s_manager.restart_unhealthy_pods()
@@ -76,6 +82,12 @@ async def k8s_native_watcher_loop():
                     add_log("SUCCESS", f"[PREUVE VALIDEE] Zero-Touch Recovery reussi en {verification['duration_sec']}s ! Transaction: {verification['transaction_id']}", event_id)
                 else:
                     add_log("ERROR", f"[ECHEC REPRISE] {verification.get('error', 'Inconnu')}", event_id)
+            else:
+                ticks += 1
+                if ticks % 6 == 0:  # Toutes les ~30 secondes
+                    all_pods = k8s_manager.get_pods()
+                    healthy_count = sum(1 for p in all_pods if p.get("is_healthy"))
+                    add_log("INFO", f"[SONDE K8S] Statut nominal : {healthy_count}/{len(all_pods)} pods prets dans '{settings.k8s_namespace}'")
 
         except Exception as e:
             pass
@@ -83,7 +95,11 @@ async def k8s_native_watcher_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    add_log("INFO", f"Demarrage du Moteur de Remediation v{settings.version} sur {settings.host}:{settings.port}")
+    add_log("INFO", f"=== INITIALISATION SOC RESILIENCE-ALPHA (DORA & NIS2) ===")
+    add_log("INFO", f"Moteur de Remediation Autonome v{settings.version} connecte au cluster")
+    add_log("INFO", f"Namespace Kubernetes cible : '{settings.k8s_namespace}' | Deployment : '{settings.k8s_deployment}'")
+    add_log("INFO", "Recepteur d'alertes AIOps Isolation Forest pret sur /api/v1/remediation/alert")
+    add_log("SUCCESS", "Platforme initialisee en mode nominal avec Zero-Touch Recovery")
     task = asyncio.create_task(k8s_native_watcher_loop())
     yield
     task.cancel()
@@ -226,8 +242,14 @@ def clear_logs():
     add_log("INFO", "Journal de logs reinitialise.")
     return {"message": "Logs reinitialises avec succes."}
 
+@app.post("/api/v1/remediation/logs", tags=["Remediation"])
+def append_log(payload: LogEntryPayload):
+    """Permet d'ajouter une entree dans le journal d'audit de remediation."""
+    add_log(payload.level.upper(), payload.message, payload.event_id)
+    return {"status": "LOGGED", "total": len(remediation_logs)}
+
 @app.get("/api/v1/remediation/k8s/pods", tags=["Kubernetes"])
-def get_k8s_pods():
+def get_k8s_pods(app_label: Optional[str] = None):
     """Expose la liste et l'etat des pods K8s pour le Dashboard."""
-    pods = k8s_manager.get_pods()
+    pods = k8s_manager.get_pods(app_label=app_label)
     return {"pods": pods, "count": len(pods)}

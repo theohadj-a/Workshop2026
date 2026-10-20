@@ -27,18 +27,15 @@ class KubernetesManager:
             logger.warning("kubectl non detecte dans le PATH ou cluster inaccessible.")
             return False
 
-    def get_pods(self, app_label: str = "payment-api") -> List[Dict[str, Any]]:
+    def get_pods(self, app_label: Optional[str] = None) -> List[Dict[str, Any]]:
         """Recupere la liste des pods et leur etat de sante."""
         if not self.k8s_available:
             return []
 
         try:
-            cmd = [
-                "kubectl", "get", "pods",
-                "-n", self.namespace,
-                "-l", f"app={app_label}",
-                "-o", "json"
-            ]
+            cmd = ["kubectl", "get", "pods", "-n", self.namespace, "-o", "json"]
+            if app_label:
+                cmd.extend(["-l", f"app={app_label}"])
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             if res.returncode != 0:
                 return []
