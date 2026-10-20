@@ -45,8 +45,8 @@ dashboardUi:
   replicaCount: 2
   image:
     repository: dashboard-ui
-    tag: v2
-    pullPolicy: Never
+    tag: latest
+    pullPolicy: IfNotPresent
   service:
     type: LoadBalancer
     port: 80

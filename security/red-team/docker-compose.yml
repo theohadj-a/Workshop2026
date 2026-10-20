@@ -1,0 +1,9 @@
+services:
+  redteam-console:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: resilience-redteam-console
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
