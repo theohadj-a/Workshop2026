@@ -11,7 +11,9 @@ spec:
   ports:
     - port: {{ .Values.dashboardUi.service.port }}
       targetPort: 80
+      {{- if and (eq .Values.dashboardUi.service.type "NodePort") .Values.dashboardUi.service.nodePort }}
       nodePort: {{ .Values.dashboardUi.service.nodePort }}
+      {{- end }}
       protocol: TCP
       name: http
   selector:

@@ -8,7 +8,7 @@ metadata:
     tier: backend
     {{- include "resilience-alpha.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.paymentApi.replicaCount }}
+  replicas: {{ if .Values.global.noReplica }}1{{ else }}{{ .Values.paymentApi.replicaCount }}{{ end }}
   selector:
     matchLabels:
       app: payment-api

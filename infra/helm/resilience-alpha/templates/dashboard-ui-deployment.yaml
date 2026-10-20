@@ -8,7 +8,7 @@ metadata:
     tier: frontend
     {{- include "resilience-alpha.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.dashboardUi.replicaCount }}
+  replicas: {{ if .Values.global.noReplica }}1{{ else }}{{ .Values.dashboardUi.replicaCount }}{{ end }}
   selector:
     matchLabels:
       app: dashboard-ui

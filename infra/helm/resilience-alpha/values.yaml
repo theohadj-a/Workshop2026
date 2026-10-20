@@ -3,6 +3,7 @@
 
 global:
   namespace: resilience-alpha
+  noReplica: false
 
 # 1. API de Paiement Métier (Microservice)
 paymentApi:
@@ -99,6 +100,23 @@ aiopsDetector:
       cpu: 200m
       memory: 128Mi
 
-# 5. Politiques de Cybersécurité
+# 5. Ingress Controller (Accès HTTP sans port-forward)
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  hosts:
+    - host: resilience.local
+      paths:
+        - path: /
+          pathType: Prefix
+    - host: localhost
+      paths:
+        - path: /
+          pathType: Prefix
+
+# 6. Politiques de Cybersécurité
 networkPolicy:
   enabled: true

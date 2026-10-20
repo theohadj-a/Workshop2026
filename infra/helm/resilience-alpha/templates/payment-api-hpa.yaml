@@ -1,4 +1,4 @@
-{{- if .Values.paymentApi.autoscaling.enabled }}
+{{- if and .Values.paymentApi.autoscaling.enabled (not .Values.global.noReplica) }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
