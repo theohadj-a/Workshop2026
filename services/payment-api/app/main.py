@@ -1,6 +1,7 @@
 import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
+from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
@@ -94,6 +95,12 @@ def root():
         "health": "/health",
         "metrics": "/metrics",
     }
+
+@app.get("/api/docs", include_in_schema=False)
+@app.get("/api/v1/docs", include_in_schema=False)
+def redirect_to_docs():
+    """Redirection conviviale vers la documentation Swagger UI."""
+    return RedirectResponse(url="/docs")
 
 # Inclusion des routeurs
 app.include_router(health.router)

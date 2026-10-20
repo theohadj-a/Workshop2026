@@ -5,12 +5,32 @@ global:
   namespace: resilience-alpha
   noReplica: false
 
-# 1. API de Paiement Métier (Microservice)
+# 1. Base de Données Relationnelle Résiliente (PostgreSQL + PVC)
+postgresql:
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: IfNotPresent
+  auth:
+    database: payments_db
+    username: postgres
+    password: resilience_secure_pass_2026
+  persistence:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+# 2. API de Paiement Métier (Microservice)
 paymentApi:
   replicaCount: 3
   image:
     repository: payment-api
-    tag: latest
+    tag: v2
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -19,6 +39,7 @@ paymentApi:
     serviceName: payment-api
     port: 8000
     dbPath: /app/data/payments.db
+    databaseUrl: "postgresql://postgres:resilience_secure_pass_2026@postgres-service:5432/payments_db"
   resources:
     requests:
       cpu: 100m
@@ -48,9 +69,8 @@ dashboardUi:
     tag: latest
     pullPolicy: IfNotPresent
   service:
-    type: LoadBalancer
+    type: ClusterIP
     port: 80
-    nodePort: 30080
   resources:
     requests:
       cpu: 50m
@@ -86,7 +106,7 @@ aiopsDetector:
   replicaCount: 1
   image:
     repository: aiops-detector
-    tag: latest
+    tag: v2
     pullPolicy: IfNotPresent
   env:
     paymentApiUrl: http://payment-api-service:8000

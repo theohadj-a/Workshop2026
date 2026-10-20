@@ -37,6 +37,8 @@ spec:
               value: "{{ .Values.paymentApi.env.port }}"
             - name: DB_PATH
               value: "{{ .Values.paymentApi.env.dbPath }}"
+            - name: DATABASE_URL
+              value: "{{ .Values.paymentApi.env.databaseUrl }}"
           resources:
             {{- toYaml .Values.paymentApi.resources | nindent 12 }}
           livenessProbe:

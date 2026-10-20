@@ -8,19 +8,21 @@
 
 ```text
 Code/
-├── docker-compose.yml              # Orchestrateur local des conteneurs (Payment, Remediation, Dashboard)
+├── docker-compose.yml              # Orchestrateur local des conteneurs (Payment, Remediation, Dashboard, Postgres)
 ├── .gitignore                      # Exclusions (secrets, venv, bases SQLite, builds)
 ├── services/
-│   ├── payment-api/                # API FastAPI de paiement fictif (instrumentée Prometheus)
+│   ├── payment-api/                # API FastAPI de paiement fictif (PostgreSQL, instrumentée Prometheus)
 │   ├── remediation-engine/         # Moteur de reprise autonome (Zero-Touch) relié à K8s & ML
-│   ├── dashboard-ui/               # Front-end React + Tailwind (Terminal bancaire & Supervision)
-│   └── auth-service/               # Service d'authentification (JWT)
+│   └── dashboard-ui/               # Front-end React + Tailwind (Terminal bancaire & Supervision)
 ├── ai-ops/
 │   └── detector/                   # Détecteur d'anomalies ML (Isolation Forest pré-entraîné Scikit-Learn)
+├── Attaquant/                      # Module Red Team externe (Dashboard Next.js + Scripts d'attaque)
+│   ├── docker-compose.yml          # Lancement autonome du dashboard attaquant
+│   ├── Dockerfile                  # Image Node.js 20 Alpine du front attaquant
+│   ├── app/                        # Application Next.js (Console cyber-attaque)
+│   └── python/                     # Scripts CLI d'attaque volumétrique et dégradation
 ├── security/
-│   ├── waf/                        # Reverse Proxy Nginx & filtrage applicatif
-│   ├── red-team/                   # Scripts d'attaque (exécutés depuis le PC Attaquant)
-│   └── secrets/                    # Gestion sécurisée des secrets (Vault / SOPS)
+│   └── waf/                        # Reverse Proxy Nginx & filtrage applicatif
 ├── infra/
 │   ├── helm/                       # Helm Chart officiel (resilience-alpha) paramétrable
 │   ├── k8s/                        # Manifestes Kubernetes natifs (Deployments, Services, HPA, RBAC)
@@ -126,4 +128,58 @@ python -m pytest services/payment-api/tests -v
 # Tests du Moteur de Remédiation (3 tests)
 $env:PYTHONPATH="services/remediation-engine"
 python -m pytest services/remediation-engine/tests -v
+```
+
+---
+
+## 🔴 Console Attaquant & Red Team (Exécution Externe)
+
+Le module **Attaquant** est conçu pour s'exécuter de façon autonome depuis le **PC de l'attaquant** (sur le réseau local ou le point d'accès Wi-Fi de l'exercice), complètement découplé du cluster Kubernetes de défense.
+
+### Démarrage Rapide via Docker Compose
+
+1. **Se positionner dans le dossier de l'attaquant** :
+   ```bash
+   cd Attaquant
+   ```
+
+2. **(Optionnel) Spécifier l'adresse IP de la cible** :
+   Par défaut, le dashboard pointe sur `http://localhost:8000`. Si l'API tourne sur un autre PC du réseau :
+   ```bash
+   # Sur Linux / macOS
+   export NEXT_PUBLIC_API_URL="http://<IP_PC_DEFENSEUR>:8000"
+
+   # Sur Windows PowerShell
+   $env:NEXT_PUBLIC_API_URL="http://<IP_PC_DEFENSEUR>:8000"
+   ```
+
+3. **Lancer le conteneur du Dashboard Attaquant** :
+   ```bash
+   docker compose up -d --build
+   ```
+
+4. **Accéder à l'interface graphique Red Team** :
+   - Ouvrez votre navigateur sur [http://localhost:3001](http://localhost:3001).
+   - L'interface vous permet de renseigner en direct l'IP et le port de la cible, tester le statut du service (`/health`), et déclencher :
+     - **HTTP Flood** : Envoi massif de requêtes concourantes de paiement.
+     - **Slowloris** : Saturation des connexions HTTP keep-alive.
+     - **Chaos & Latence** : Dégradation artificielle pour forcer le déclenchement de l'AIOps.
+
+Pour arrêter le dashboard attaquant :
+```bash
+docker compose down
+```
+
+### Alternative : Exécution CLI Python directe
+
+Si vous préférez exécuter les attaques en ligne de commande depuis le PC attaquant :
+```bash
+cd Attaquant
+pip install httpx
+
+# Lancer un HTTP Flood vers l'API cible
+python python/attack.py --target <IP_PC_DEFENSEUR> --port 8000 --attack flood --duration 30 --threads 15
+
+# Simuler une injection de latence/chaos
+python python/attack.py --target <IP_PC_DEFENSEUR> --port 8000 --attack chaos --duration 30
 ```

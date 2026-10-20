@@ -8,6 +8,7 @@ class Settings(BaseModel):
     host: str = os.getenv("HOST", "0.0.0.0")
     port: int = int(os.getenv("PORT", "8000"))
     db_path: str = os.getenv("DB_PATH", "payments.db")
+    database_url: str = os.getenv("DATABASE_URL", "")
     environment: str = os.getenv("ENVIRONMENT", "development")
     cors_origins: list[str] = ["*"]
 

@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PROJECT RESILIENCE-ALPHA — Console Attaquant & Red Team
 
-## Getting Started
+Ce module regroupe les outils de génération d'attaques cyber et de stress-test applicatif pour évaluer la résilience autonome de la plateforme **Resilience-Alpha**.
 
-First, run the development server:
+> **Note d'architecture :** Ce module s'exécute de façon autonome sur la machine de l'attaquant (PC 2) reliée au réseau local ou au point d'accès Wi-Fi de l'exercice, complètement hors du cluster Kubernetes de défense.
+
+---
+
+## 🚀 Démarrage Rapide (Docker Compose)
+
+### 1. Prérequis
+- [Docker & Docker Compose](https://docs.docker.com/get-docker/) installés sur le PC attaquant.
+
+### 2. Configuration & Lancement
+
+Dans ce dossier (`Code/Attaquant`) :
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# 1. (Optionnel) Définir l'URL de l'API de la cible si elle n'est pas sur localhost
+# Linux / macOS
+export NEXT_PUBLIC_API_URL="http://<IP_PC_DEFENSEUR>:8000"
+# Windows PowerShell
+$env:NEXT_PUBLIC_API_URL="http://<IP_PC_DEFENSEUR>:8000"
+
+# 2. Démarrer le conteneur du Dashboard Hacker
+docker compose up -d --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Accès Web
+- Interface Web : **[http://localhost:3001](http://localhost:3001)**
+- Dans l'interface, vous pouvez ajuster l'hôte cible (`targetHost`), le port (`targetPort`), tester le `/health` de l'API cible en un clic et lancer des attaques en direct.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Arrêt
+```bash
+docker compose down
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🐍 Exécution CLI Directe (Python)
 
-To learn more about Next.js, take a look at the following resources:
+Pour lancer des attaques directement depuis un terminal :
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+# Dépendances requises
+pip install httpx
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Attaque HTTP Flood (volumétrie forte sur /api/v1/payments)
+python python/attack.py --target <IP_PC_DEFENSEUR> --port 8000 --attack flood --duration 30 --threads 20
 
-## Deploy on Vercel
+# Attaque Slowloris (épuisement des sockets HTTP keep-alive)
+python python/attack.py --target <IP_PC_DEFENSEUR> --port 8000 --attack slowloris --duration 45
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Injection de Chaos & Latence
+python python/attack.py --target <IP_PC_DEFENSEUR> --port 8000 --attack chaos --duration 30
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## 🎯 Scénarios d'Attaque Disponibles
+
+| Type d'Attaque | Cible | Effet Attendu | Réaction Défense |
+| :--- | :--- | :--- | :--- |
+| **HTTP Flood** | `POST /api/v1/payments` | Pic de requêtes concurrentes, saturation CPU | HPA déclenche le scaling K8s (jusqu'à 10 pods) |
+| **Chaos API** | `/health`, `/payments` | Hausse du taux d'erreurs 5xx & latence | AIOps Isolation Forest détecte l'anomalie, remédiation auto |
+| **Slowloris** | Socket HTTP (keep-alive) | Consommation des file descriptors | Reverse Proxy / WAF Nginx & redémarrage des pods |

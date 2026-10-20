@@ -1,0 +1,70 @@
+---
+- name: "PROJECT RESILIENCE-ALPHA — Déploiement Automatisé du Cluster Kubernetes"
+  hosts: k8s_nodes
+  gather_facts: false
+  vars:
+    chart_dir: "{{ playbook_dir }}/../../helm/resilience-alpha"
+    namespace: "resilience-alpha"
+    release_name: "resilience-alpha"
+
+  tasks:
+    - name: "1. Vérification de la disponibilité des binaires (kubectl et helm)"
+      ansible.builtin.command: "{{ item }} --help"
+      register: tool_check
+      changed_when: false
+      loop:
+        - kubectl
+        - helm
+
+    - name: "2. Vérification de l'accès au cluster Kubernetes"
+      ansible.builtin.command: kubectl cluster-info
+      register: cluster_info
+      changed_when: false
+
+    - name: "3. Création du Namespace Kubernetes"
+      ansible.builtin.command: "kubectl create namespace {{ namespace }}"
+      register: ns_create
+      failed_when: ns_create.rc != 0 and 'AlreadyExists' not in ns_create.stderr
+      changed_when: "'created' in ns_create.stdout"
+
+    - name: "4. Linting et validation du Helm Chart"
+      ansible.builtin.command: "helm lint {{ chart_dir }}"
+      changed_when: false
+
+    - name: "5. Déploiement / Mise à jour de la stack via Helm"
+      ansible.builtin.command: >
+        helm upgrade --install {{ release_name }} {{ chart_dir }}
+        --namespace {{ namespace }}
+        --set global.namespace={{ namespace }}
+      register: helm_deploy
+      changed_when: "'Release \"' + release_name + '\" has been upgraded' in helm_deploy.stdout or 'has been installed' in helm_deploy.stdout"
+
+    - name: "6. Attente du démarrage de la base de données PostgreSQL"
+      ansible.builtin.command: >
+        kubectl rollout status deployment/postgres
+        --namespace {{ namespace }}
+        --timeout=120s
+      changed_when: false
+
+    - name: "7. Attente du démarrage de l'API de Paiement"
+      ansible.builtin.command: >
+        kubectl rollout status deployment/payment-api
+        --namespace {{ namespace }}
+        --timeout=120s
+      changed_when: false
+
+    - name: "8. Attente du démarrage du Moteur de Remédiation"
+      ansible.builtin.command: >
+        kubectl rollout status deployment/remediation-engine
+        --namespace {{ namespace }}
+        --timeout=120s
+      changed_when: false
+
+    - name: "9. Affichage récapitulatif des ressources déployées"
+      ansible.builtin.command: "kubectl get pods,pvc,svc,ingress -n {{ namespace }}"
+      register: final_status
+      changed_when: false
+
+    - name: "10. Rapport d'exécution"
+      ansible.builtin.debug:
+        msg: "{{ final_status.stdout_lines }}"

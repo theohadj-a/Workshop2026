@@ -110,6 +110,15 @@ class AnomalyDetector:
         prediction = self.model.predict(metrics)[0]  # 1 = Normal, -1 = Anomalie
         score = float(self.model.decision_function(metrics)[0])
         is_anomaly = (prediction == -1)
+
+        # Garde-fou cyber-resilience : une charge nominale ou un systeme au repos (sans erreur et avec latence faible)
+        # ne doit jamais declencher de fausse alerte de remédiation
+        avg_latency_ms = metrics[0][1]
+        error_rate = metrics[0][2]
+        active_req = metrics[0][3]
+        if error_rate < 0.05 and avg_latency_ms < 150.0 and active_req <= 10.0:
+            is_anomaly = False
+
         return is_anomaly, score
 
     def notify_remediation(self, metrics: np.ndarray, score: float):
