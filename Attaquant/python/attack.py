@@ -79,7 +79,7 @@ class RedTeamAttacker:
 
         time.sleep(duration_sec)
         self.running = False
-        print(f"\n[✓] Fin du HTTP Flood. Total: {self.stats['sent']} requêtes (Succès: {self.stats['success']}, Bloquées/Erreurs: {self.stats['errors']}).")
+        print(f"\n[OK] Fin du HTTP Flood. Total: {self.stats['sent']} requêtes (Succès: {self.stats['success']}, Bloquées/Erreurs: {self.stats['errors']}).")
 
     def attack_slowloris(self, sockets_count: int = 80, duration_sec: int = 30):
         """Attaque Slowloris : ouverture de connexions partielles pour saturer le serveur."""
@@ -120,7 +120,7 @@ class RedTeamAttacker:
                 s.close()
             except Exception:
                 pass
-        print(f"\n[✓] Fin de l'attaque Slowloris.")
+        print(f"\n[OK] Fin de l'attaque Slowloris.")
 
     def trigger_chaos_attack(self, latency_ms: int = 1500, error_rate: float = 0.7):
         """Injecte un état d'anomalie critique directement via les routes chaos de l'API."""
@@ -132,7 +132,7 @@ class RedTeamAttacker:
                 timeout=5.0,
             )
             if res.status_code == 200:
-                print("[✓] Chaos injecté avec succès ! Le modèle ML AIOps doit maintenant détecter l'anomalie.")
+                print("[OK] Chaos injecté avec succès ! Le modèle ML AIOps doit maintenant détecter l'anomalie.")
             else:
                 print(f"[!] Erreur de configuration chaos : HTTP {res.status_code}")
         except Exception as e:
@@ -146,7 +146,7 @@ class RedTeamAttacker:
             res = client.get(f"{self.base_url}/api/v1/payments")
             print(f"[*] Code HTTP retourné : {res.status_code}")
             if res.status_code == 403:
-                print("[✓] SUCCÈS DÉFENSE : Le WAF a intercepté et bloqué le scanner suspect (HTTP 403 Forbidden) !")
+                print("[OK] SUCCÈS DÉFENSE : Le WAF a intercepté et bloqué le scanner suspect (HTTP 403 Forbidden) !")
                 print(f"    Réponse WAF : {res.text.strip()}")
             else:
                 print(f"[!] ATTENTION : Le scanner n'a pas été bloqué (Code HTTP {res.status_code}). Vérifiez la configuration Nginx.")
