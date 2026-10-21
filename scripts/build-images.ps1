@@ -1,11 +1,36 @@
 param (
     [string]$Tag = "latest",
     [string]$Service = "all",
-    [string]$Platform = "linux/amd64",
-    [switch]$NoCache = $false
+    [string]$Platform = "",
+    [switch]$NoCache = $false,
+    [switch]$NoKindLoad = $false,
+    [string]$KindCluster = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+# Détection automatique de la plateforme linux selon l'environnement PowerShell
+if ([string]::IsNullOrWhiteSpace($Platform)) {
+    $arch = if ($env:PROCESSOR_ARCHITECTURE -match "ARM64") { "arm64" } else { "amd64" }
+    $Platform = "linux/$arch"
+}
+
+# Détection automatique et sécurisée d'un cluster Kind actif
+if (-not $NoKindLoad -and [string]::IsNullOrWhiteSpace($KindCluster)) {
+    if (Get-Command kind -ErrorAction SilentlyContinue) {
+        try {
+            $rawClusters = cmd /c "kind get clusters 2>nul"
+            if (-not [string]::IsNullOrWhiteSpace($rawClusters)) {
+                $firstCluster = ($rawClusters -split "`r?`n")[0]
+                if (-not [string]::IsNullOrWhiteSpace($firstCluster) -and $firstCluster -notmatch "No kind clusters") {
+                    $KindCluster = $firstCluster.Trim()
+                }
+            }
+        } catch {
+            $KindCluster = $null
+        }
+    }
+}
 
 function Log-Info { param([string]$msg) Write-Host "[INFO] $msg" -ForegroundColor Cyan }
 function Log-Success { param([string]$msg) Write-Host "[SUCCESS] $msg" -ForegroundColor Green }
@@ -16,6 +41,10 @@ Clear-Host
 Write-Host "==========================================================" -ForegroundColor Magenta
 Write-Host "  PROJECT RESILIENCE-ALPHA - DOCKER IMAGE BUILDER         " -ForegroundColor Magenta
 Write-Host "  Equipe : Theo, Mael, Flora, Fely, Aymeric               " -ForegroundColor Magenta
+Write-Host "  Plateforme cible : $Platform | Tag : $Tag               " -ForegroundColor Magenta
+if ($KindCluster) {
+    Write-Host "  Cluster Kind cible : $KindCluster (auto-load actif)      " -ForegroundColor Magenta
+}
 Write-Host "==========================================================" -ForegroundColor Magenta
 Write-Host ""
 
@@ -32,6 +61,8 @@ try {
     exit 1
 }
 
+$RootDir = Split-Path -Parent $PSScriptRoot
+
 $ServicesToBuild = @(
     @{
         Name = "payment-api"
@@ -44,23 +75,18 @@ $ServicesToBuild = @(
         ImageName = "remediation-engine"
     },
     @{
+        Name = "auth-service"
+        Context = "services/auth-service"
+        ImageName = "auth-service"
+    },
+    @{
         Name = "dashboard-ui"
         Context = "services/dashboard-ui"
         ImageName = "dashboard-ui"
     },
     @{
-    @{
-        Name = "auth-service"
-        Context = "services/auth-service"
-        ImageName = "auth-service"
-    },
         Name = "aiops-detector"
         Context = "ai-ops/detector"
-    @{
-        Name = "auth-service"
-        Context = "services/auth-service"
-        ImageName = "auth-service"
-    },
         ImageName = "aiops-detector"
     }
 )
@@ -78,20 +104,24 @@ $TotalStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
 foreach ($s in $ServicesToBuild) {
     $ImageFull = "$($s.ImageName):$Tag"
+    $TargetDir = Join-Path $RootDir $s.Context
+    
     Write-Host ""
     Write-Host "----------------------------------------------------------" -ForegroundColor DarkGray
-    Log-Info "Demarrage du build : $ImageFull (Dossier : $($s.Context), Plateforme : $Platform)"
-    
-    $BuildArgs = @("buildx", "build", "--platform", $Platform, "-t", $ImageFull, "--load", $s.Context)
-    if ($NoCache) {
-        $BuildArgs += "--no-cache"
-        Log-Warn "Option --no-cache activee."
-    }
+    Log-Info "Demarrage du build : $ImageFull dans $($s.Context) (Plateforme : $Platform)"
 
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $status = "OK"
 
+    Push-Location $TargetDir
     try {
+        $BuildArgs = @("buildx", "build", "--platform", $Platform, "-t", $ImageFull)
+        if ($NoCache) {
+            $BuildArgs += "--no-cache"
+            Log-Warn "Option --no-cache activee."
+        }
+        $BuildArgs += @("--load", ".")
+
         & docker $BuildArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Erreur lors du build de l'image $($s.Name)"
@@ -99,11 +129,20 @@ foreach ($s in $ServicesToBuild) {
         $sw.Stop()
         $duration = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
         Log-Success "Image $ImageFull construite avec succes en ${duration}s."
+
+        # Injection automatique dans Kind pour accès immédiat par Helm
+        if ($KindCluster) {
+            Log-Info "Injection de $ImageFull dans le cluster Kind '$KindCluster'..."
+            & kind load docker-image $ImageFull --name $KindCluster
+            Log-Success "Image $ImageFull injectee dans Kind avec succes."
+        }
     } catch {
         $sw.Stop()
         $duration = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
         $status = "FAILED"
-        Log-Error "Echec du build pour $($s.Name)"
+        Log-Error "Echec du build pour $($s.Name) : $_"
+    } finally {
+        Pop-Location
     }
 
     $BuildResults += [PSCustomObject]@{
@@ -127,7 +166,13 @@ Write-Host "Duree totale du build : ${TotalDuration}s" -ForegroundColor Cyan
 Write-Host ""
 
 Log-Info "Images Docker locales disponibles :"
-docker images --filter "reference=payment-api" --filter "reference=remediation-engine" --filter "reference=dashboard-ui" --filter "reference=aiops-detector"
+docker images --filter "reference=payment-api" --filter "reference=remediation-engine" --filter "reference=auth-service" --filter "reference=dashboard-ui" --filter "reference=aiops-detector"
+
+if ($KindCluster) {
+    Write-Host ""
+    Log-Success "Toutes les images sont injectees dans le cluster Kind '$KindCluster'."
+    Log-Info "Helm peut desormais instancier les pods sans ImagePullBackOff (pullPolicy: IfNotPresent)."
+}
 
 Write-Host ""
-Log-Success "Build termine ! Deploiement possible via Docker Compose ou Helm."
+Log-Success "Build termine ! Deploiement pret pour Helm."

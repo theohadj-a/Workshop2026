@@ -8,6 +8,7 @@ Attaques supportées :
   1. HTTP Flood (saturation de requêtes concurrentes)
   2. Slowloris (épuisement de connexions HTTP keep-alive)
   3. Injection d'erreurs applicatives & latence (Chaos API)
+  4. Test de sonde Scanner WAF (vérification du blocage OWASP 403 Forbidden)
 """
 
 import sys
@@ -36,11 +37,12 @@ class RedTeamAttacker:
     def print_status(self):
         while self.running:
             time.sleep(2)
-            print(f"[RED TEAM] Requêtes envoyées: {self.stats['sent']} | Succès: {self.stats['success']} | Échecs/Bloquées: {self.stats['errors']}")
+            print(f"[RED TEAM] Requêtes envoyées: {self.stats['sent']} | Succès (201): {self.stats['success']} | Bloquées/Échecs: {self.stats['errors']}")
 
     def attack_http_flood(self, duration_sec: int = 30, concurrency: int = 15):
         """Attaque HTTP Flood volumétrique vers l'API de paiement."""
         print(f"\n[+] Lancement HTTP Flood vers {self.base_url} ({duration_sec}s, {concurrency} threads)...")
+        print(f"[i] Si ciblé sur le port 3000 (WAF), le rate limiting de 5 req/s (burst 10) renverra du HTTP 429.")
         self.running = True
         self.stats = {"sent": 0, "errors": 0, "success": 0}
         
@@ -77,7 +79,7 @@ class RedTeamAttacker:
 
         time.sleep(duration_sec)
         self.running = False
-        print(f"\n[✓] Fin du HTTP Flood. Total: {self.stats['sent']} requêtes.")
+        print(f"\n[✓] Fin du HTTP Flood. Total: {self.stats['sent']} requêtes (Succès: {self.stats['success']}, Bloquées/Erreurs: {self.stats['errors']}).")
 
     def attack_slowloris(self, sockets_count: int = 80, duration_sec: int = 30):
         """Attaque Slowloris : ouverture de connexions partielles pour saturer le serveur."""
@@ -136,30 +138,55 @@ class RedTeamAttacker:
         except Exception as e:
             print(f"[!] Échec de connexion : {e}")
 
+    def test_scanner_detection(self):
+        """Test de détection WAF par signature d'outils d'attaque (ex: Sqlmap / Nikto)."""
+        print(f"\n[+] Test de détection de scanner malveillant vers {self.base_url}...")
+        client = httpx.Client(timeout=4.0, headers={"User-Agent": "sqlmap/1.7.2#stable"})
+        try:
+            res = client.get(f"{self.base_url}/api/v1/payments")
+            print(f"[*] Code HTTP retourné : {res.status_code}")
+            if res.status_code == 403:
+                print("[✓] SUCCÈS DÉFENSE : Le WAF a intercepté et bloqué le scanner suspect (HTTP 403 Forbidden) !")
+                print(f"    Réponse WAF : {res.text.strip()}")
+            else:
+                print(f"[!] ATTENTION : Le scanner n'a pas été bloqué (Code HTTP {res.status_code}). Vérifiez la configuration Nginx.")
+        except Exception as e:
+            print(f"[!] Échec de connexion : {e}")
+
 
 def main():
     print(BANNER)
     parser = argparse.ArgumentParser(description="Projet Resilience-Alpha - Script Red Team")
-    parser.add_argument("--host", default="localhost", help="IP ou nom d'hôte de la cible (ex: 192.168.1.50)")
-    parser.add_argument("--port", type=int, default=8000, help="Port cible de l'API (8000 par défaut, ou 3000 pour le Dashboard)")
-    parser.add_argument("--mode", choices=["flood", "slowloris", "chaos", "demo"], default="demo",
-                        help="Type d'attaque : flood, slowloris, chaos, demo (enchaîne flood + chaos)")
-    parser.add_argument("--duration", type=int, default=25, help="Durée de l'attaque en secondes")
+    parser.add_argument("--host", "--target", dest="host", default="localhost",
+                        help="IP ou nom d'hôte de la cible (ex: 192.168.1.50)")
+    parser.add_argument("--port", type=int, default=3000,
+                        help="Port cible (3000 pour le WAF Nginx / Dashboard, 8000 pour le bypass direct)")
+    parser.add_argument("--mode", "--attack", dest="mode",
+                        choices=["flood", "slowloris", "chaos", "scanner", "demo"], default="demo",
+                        help="Type d'attaque : flood, slowloris, chaos, scanner, demo")
+    parser.add_argument("--duration", type=int, default=25,
+                        help="Durée de l'attaque en secondes")
+    parser.add_argument("--threads", "--concurrency", dest="threads", type=int, default=15,
+                        help="Nombre de threads concurrents pour le flood")
 
     args = parser.parse_args()
     attacker = RedTeamAttacker(args.host, args.port)
 
     if args.mode == "flood":
-        attacker.attack_http_flood(duration_sec=args.duration)
+        attacker.attack_http_flood(duration_sec=args.duration, concurrency=args.threads)
     elif args.mode == "slowloris":
         attacker.attack_slowloris(duration_sec=args.duration)
     elif args.mode == "chaos":
         attacker.trigger_chaos_attack()
+    elif args.mode == "scanner":
+        attacker.test_scanner_detection()
     elif args.mode == "demo":
-        print("[DEMO SCENARIO] 1. Injection d'une perturbation forte (Chaos)")
+        print("[DEMO SCENARIO] 1. Test du WAF avec scanner suspect")
+        attacker.test_scanner_detection()
+        print("\n[DEMO SCENARIO] 2. Injection d'une perturbation forte (Chaos)")
         attacker.trigger_chaos_attack(latency_ms=1200, error_rate=0.65)
-        print("[DEMO SCENARIO] 2. Envoi d'une rafale de requêtes pour saturer l'observabilité")
-        attacker.attack_http_flood(duration_sec=15, concurrency=10)
+        print("\n[DEMO SCENARIO] 3. Envoi d'une rafale de requêtes pour saturer l'observabilité")
+        attacker.attack_http_flood(duration_sec=15, concurrency=args.threads)
         print("\n[+] Attaque terminée. Regardez la console de Remédiation pour constater le Zero-Touch Recovery !")
 
 if __name__ == "__main__":

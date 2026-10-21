@@ -30,7 +30,7 @@ paymentApi:
   replicaCount: 3
   image:
     repository: payment-api
-    tag: v2
+    tag: latest
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP
@@ -106,7 +106,7 @@ aiopsDetector:
   replicaCount: 1
   image:
     repository: aiops-detector
-    tag: v2
+    tag: latest
     pullPolicy: IfNotPresent
   env:
     paymentApiUrl: http://payment-api-service:8000

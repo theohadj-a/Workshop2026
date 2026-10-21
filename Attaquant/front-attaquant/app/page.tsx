@@ -18,7 +18,7 @@ interface LogEntry {
 export default function RedTeamConsole() {
   // Configuration de la cible
   const [targetHost, setTargetHost] = useState<string>("localhost");
-  const [targetPort, setTargetPort] = useState<number>(8000);
+  // Port 3000 = WAF Nginx / Dashboard (Port 8000 = Direct API Bypass)`r`n  const [targetPort, setTargetPort] = useState<number>(3000);
   const [isHealthy, setIsHealthy] = useState<boolean | null>(null);
   const [healthDetails, setHealthDetails] = useState<any>(null);
 

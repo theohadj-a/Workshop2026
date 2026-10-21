@@ -9,7 +9,7 @@ services:
     environment:
       - NODE_ENV=development
       # Si ton front doit communiquer avec l'API sur le PC de ton collègue ou en local :
-      - NEXT_PUBLIC_API_URL=http://localhost:8000 
+      - NEXT_PUBLIC_API_URL=http://localhost:3000 
     volumes:
       - .:/app
       - /app/node_modules # Évite que les node_modules locaux écrasent ceux du conteneur (très important sous Mac/Linux)
