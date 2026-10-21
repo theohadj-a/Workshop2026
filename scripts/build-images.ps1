@@ -49,8 +49,18 @@ $ServicesToBuild = @(
         ImageName = "dashboard-ui"
     },
     @{
+    @{
+        Name = "auth-service"
+        Context = "services/auth-service"
+        ImageName = "auth-service"
+    },
         Name = "aiops-detector"
         Context = "ai-ops/detector"
+    @{
+        Name = "auth-service"
+        Context = "services/auth-service"
+        ImageName = "auth-service"
+    },
         ImageName = "aiops-detector"
     }
 )
@@ -58,7 +68,7 @@ $ServicesToBuild = @(
 if ($Service -ne "all") {
     $ServicesToBuild = $ServicesToBuild | Where-Object { $_.Name -eq $Service }
     if ($ServicesToBuild.Count -eq 0) {
-        Log-Error "Service inconnu : $Service. Options valides: all, payment-api, remediation-engine, dashboard-ui, aiops-detector."
+        Log-Error "Service inconnu : $Service. Options valides: all, payment-api, remediation-engine, auth-service, dashboard-ui, aiops-detector."
         exit 1
     }
 }

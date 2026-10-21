@@ -40,6 +40,27 @@ services:
       payment-api:
         condition: service_healthy
 
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: resilience-auth-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - SERVICE_NAME=auth-service
+      - PORT=8002
+      - JWT_SECRET=soc-resilience-secret-key-2026
+    networks:
+      - resilience-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8002/health').getcode() == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
   dashboard-ui:
     build:
       context: ./services/dashboard-ui
@@ -52,6 +73,7 @@ services:
       - resilience-net
     depends_on:
       - payment-api
+      - auth-service
 
   aiops-detector:
     build:

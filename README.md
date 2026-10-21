@@ -13,6 +13,7 @@ Code/
 ├── services/
 │   ├── payment-api/                # API FastAPI de paiement fictif (PostgreSQL, instrumentée Prometheus)
 │   ├── remediation-engine/         # Moteur de reprise autonome (Zero-Touch) relié à K8s & ML
+│   ├── auth-service/               # Microservice d'authentification JWT (Supervision SOC & RBAC)
 │   └── dashboard-ui/               # Front-end React + Tailwind (Terminal bancaire & Supervision)
 ├── ai-ops/
 │   └── detector/                   # Détecteur d'anomalies ML (Isolation Forest pré-entraîné Scikit-Learn)
@@ -47,6 +48,7 @@ docker compose up -d --build
 - 🩺 **API Healthcheck** : [http://localhost:8000/health](http://localhost:8000/health)
 - 📊 **Métriques Prometheus** : [http://localhost:8000/metrics](http://localhost:8000/metrics)
 - 🤖 **Moteur de Remédiation** : [http://localhost:8001/health](http://localhost:8001/health)
+- 🔐 **Service d'Authentification SOC** : [http://localhost:8002/health](http://localhost:8002/health)
 
 Pour stopper la stack :
 ```bash
@@ -183,3 +185,14 @@ python python/attack.py --target <IP_PC_DEFENSEUR> --port 8000 --attack flood --
 # Simuler une injection de latence/chaos
 python python/attack.py --target <IP_PC_DEFENSEUR> --port 8000 --attack chaos --duration 30
 ```
+
+---
+
+## 🔐 Sécurisation & Contrôle d'Accès (Monitoring SOC)
+
+Conformément aux exigences de cloisonnement et aux principes **DORA / NIS2** :
+- 💳 **Terminal de Paiement (`/`) :** Accessible publiquement sans restriction d'authentification pour simuler un service transactionnel client ouvert.
+- 🔴 **Console Attaquant (`Attaquant/`) :** Découplée et sans authentification défensive, simulant un acteur hostile externe.
+- 🛡️ **Supervision & Commandes de Remédiation (`/supervision`) :** Strictement protégée par jeton cryptographique **JWT Bearer** délivré par le microservice [`services/auth-service`](services/auth-service).
+  - **Profil Administrateur SOC :** `admin` / `socadmin2026!` (Droits de lecture métriques, déclenchement manuel et purge logs).
+  - **Profil Analyste SOC :** `operator` / `operator2026!` (Droits de consultation et déclenchement).

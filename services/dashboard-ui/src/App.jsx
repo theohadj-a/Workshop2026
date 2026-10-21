@@ -23,7 +23,9 @@ import {
   Flame,
   Radio,
   Sliders,
-  CheckSquare
+  CheckSquare,
+  User,
+  LogOut
 } from 'lucide-react';
 
 export default function App() {
@@ -80,6 +82,59 @@ export default function App() {
   const [logFilter, setLogFilter] = useState('ALL');
   const [copiedLogs, setCopiedLogs] = useState(false);
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
+
+  // Authentification Supervision SOC
+  const [authToken, setAuthToken] = useState(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('resilience_soc_token') : null;
+  });
+  const [authUser, setAuthUser] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('resilience_soc_user');
+        return saved ? JSON.parse(saved) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  const [loginUsername, setLoginUsername] = useState('admin');
+  const [loginPassword, setLoginPassword] = useState('socadmin2026!');
+  const [loginError, setLoginError] = useState(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  const handleLogin = async (e) => {
+    if (e) e.preventDefault();
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: loginUsername, password: loginPassword }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || 'Identifiants invalides');
+      }
+      const data = await res.json();
+      setAuthToken(data.access_token);
+      setAuthUser(data.user);
+      localStorage.setItem('resilience_soc_token', data.access_token);
+      localStorage.setItem('resilience_soc_user', JSON.stringify(data.user));
+    } catch (err) {
+      setLoginError(err.message);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setAuthToken(null);
+    setAuthUser(null);
+    localStorage.removeItem('resilience_soc_token');
+    localStorage.removeItem('resilience_soc_user');
+  };
 
   // Verrou pour éviter les requêtes de polling concurrentes en vol
   const isFetchingRef = useRef(false);
@@ -155,14 +210,19 @@ export default function App() {
         return;
       }
 
-      // 2. Sur la page "/supervision", requête groupée en parallèle
+      // 2. Sur la page "/supervision", vérification de l'authentification SOC
+      if (!authToken) {
+        return;
+      }
+
+      const authHeaders = authToken ? { Authorization: `Bearer ${authToken}` } : {};
       const [healthRes, txRes, chaosRes, logsRes, histRes, podsRes] = await Promise.allSettled([
         fetch('/health'),
         fetch('/api/v1/payments?limit=8'),
         fetch('/api/v1/chaos/status'),
-        fetch('/remediation/api/v1/remediation/logs'),
-        fetch('/remediation/api/v1/remediation/history'),
-        fetch('/remediation/api/v1/remediation/k8s/pods'),
+        fetch('/remediation/api/v1/remediation/logs', { headers: authHeaders }),
+        fetch('/remediation/api/v1/remediation/history', { headers: authHeaders }),
+        fetch('/remediation/api/v1/remediation/k8s/pods', { headers: authHeaders }),
       ]);
 
       if (healthRes.status === 'fulfilled' && healthRes.value.ok) {
@@ -221,7 +281,7 @@ export default function App() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isSupervision, autoRefreshEnabled]);
+  }, [isSupervision, autoRefreshEnabled, authToken]);
 
   // Soumission d'une transaction de paiement client
   const handlePayment = async (e) => {
@@ -486,6 +546,25 @@ export default function App() {
                 <span>Supervision SOC</span>
               </button>
             </div>
+
+            {isSupervision && authToken && (
+              <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-800">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-950/80 border border-indigo-700/50 text-[11px] text-indigo-200">
+                  <User className="w-3 h-3 text-indigo-400" />
+                  <span className="font-semibold">{authUser?.username || 'admin'}</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-indigo-900 text-indigo-300 font-mono hidden md:inline">
+                    {authUser?.role || 'SOC'}
+                  </span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950/80 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-800 transition"
+                  title="Déconnexion SOC"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Raccourcis Utiles vers l'Écosystème (Docs, Metrics, Attaquant) */}
@@ -782,7 +861,107 @@ export default function App() {
       {/* ========================================================================= */}
       {/* VUE 2 : CENTRE DE SUPERVISION SOC & CYBER-RÉSILIENCE (SUR "/supervision") */}
       {/* ========================================================================= */}
-      {isSupervision && (
+      {isSupervision && !authToken && (
+        <main className="flex-1 max-w-md mx-auto w-full p-4 md:p-8 flex flex-col justify-center">
+          <div className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-2xl p-6 md:p-8 space-y-6">
+            <div className="flex flex-col items-center text-center space-y-2">
+              <div className="p-3 bg-indigo-600/20 border border-indigo-500/30 rounded-2xl text-indigo-400">
+                <Lock className="w-8 h-8" />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-wide">
+                AUTHENTIFICATION SOC OPÉRATEUR
+              </h2>
+              <p className="text-xs text-slate-400">
+                Accès restreint à la supervision et aux commandes de cyber-résilience (NIS2 / DORA).
+              </p>
+            </div>
+
+            {loginError && (
+              <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-600/50 text-rose-200 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Identifiant Opérateur
+                </label>
+                <input
+                  type="text"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  placeholder="admin"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Mot de Passe
+                </label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  placeholder="••••••••••••"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition shadow-lg shadow-indigo-600/30 disabled:opacity-50"
+                >
+                  {isLoggingIn ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <ShieldCheck className="w-4 h-4" />
+                  )}
+                  <span>{isLoggingIn ? 'Authentification...' : 'Déverrouiller la Supervision'}</span>
+                </button>
+              </div>
+            </form>
+
+            <div className="pt-4 border-t border-slate-800/80">
+              <p className="text-[10px] font-mono uppercase text-slate-500 text-center mb-2">
+                Profils Rapides (Démonstration Jury)
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginUsername('admin');
+                    setLoginPassword('socadmin2026!');
+                  }}
+                  className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-slate-300 transition"
+                >
+                  <div className="font-semibold text-indigo-300">SOC Lead</div>
+                  <div className="text-[10px] font-mono text-slate-500">admin</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginUsername('operator');
+                    setLoginPassword('operator2026!');
+                  }}
+                  className="p-2 rounded-lg bg-slate-950 hover:bg-slate-800 border border-slate-800 text-left text-slate-300 transition"
+                >
+                  <div className="font-semibold text-emerald-300">Analyste</div>
+                  <div className="text-[10px] font-mono text-slate-500">operator</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
+
+      {isSupervision && authToken && (
         <main className="flex-1 max-w-7xl mx-auto w-full p-4 md:p-8 space-y-6">
           {/* BANDEAU D'ALERTE EN CAS D'INCIDENT / CHAOS ACTIF */}
           {chaosState.is_active && (
