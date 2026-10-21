@@ -26,4 +26,26 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.paymentApi.service.port }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-service-netpol
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: dashboard-ui
+      ports:
+        - protocol: TCP
+          port: {{ .Values.authService.service.port }}
 {{- end }}

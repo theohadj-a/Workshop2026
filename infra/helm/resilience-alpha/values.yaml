@@ -140,3 +140,36 @@ ingress:
 # 6. Politiques de Cybersécurité
 networkPolicy:
   enabled: true
+
+
+# 7. Microservice Authentification SOC (JWT Bearer)
+authService:
+  replicaCount: 1
+  image:
+    repository: auth-service
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8002
+  env:
+    serviceName: auth-service
+    port: 8002
+    jwtSecret: "soc-resilience-secret-key-2026"
+    jwtAlgorithm: "HS256"
+    jwtExpirationHours: 8
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  livenessProbe:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readinessProbe:
+    path: /health
+    initialDelaySeconds: 3
+    periodSeconds: 5

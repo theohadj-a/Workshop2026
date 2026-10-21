@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: auth-service
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.authService.service.type }}
+  ports:
+    - port: {{ .Values.authService.service.port }}
+      targetPort: {{ .Values.authService.service.port }}
+      protocol: TCP
+      name: http
+  selector:
+    app: auth-service
