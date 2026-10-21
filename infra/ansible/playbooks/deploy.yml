@@ -53,18 +53,32 @@
         --timeout=120s
       changed_when: false
 
-    - name: "8. Attente du démarrage du Moteur de Remédiation"
+    - name: "8. Attente du démarrage du Service d'Authentification SOC"
+      ansible.builtin.command: >
+        kubectl rollout status deployment/auth-service
+        --namespace {{ namespace }}
+        --timeout=120s
+      changed_when: false
+
+    - name: "9. Attente du démarrage du Moteur de Remédiation"
       ansible.builtin.command: >
         kubectl rollout status deployment/remediation-engine
         --namespace {{ namespace }}
         --timeout=120s
       changed_when: false
 
-    - name: "9. Affichage récapitulatif des ressources déployées"
+    - name: "10. Attente du démarrage du Dashboard UI & WAF"
+      ansible.builtin.command: >
+        kubectl rollout status deployment/dashboard-ui
+        --namespace {{ namespace }}
+        --timeout=120s
+      changed_when: false
+
+    - name: "11. Affichage récapitulatif des ressources déployées"
       ansible.builtin.command: "kubectl get pods,pvc,svc,ingress -n {{ namespace }}"
       register: final_status
       changed_when: false
 
-    - name: "10. Rapport d'exécution"
+    - name: "12. Rapport d'exécution"
       ansible.builtin.debug:
         msg: "{{ final_status.stdout_lines }}"
