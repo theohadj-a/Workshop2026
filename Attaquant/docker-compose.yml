@@ -1,0 +1,16 @@
+services:
+  dashboard-hacker:
+    build:
+      context: .  # Chemin vers le dossier contenant ton app Next.js et ton Dockerfile
+      dockerfile: Dockerfile
+    container_name: resilience-dashboard-hacker
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+      # Si ton front doit communiquer avec l'API sur le PC de ton collègue ou en local :
+      - NEXT_PUBLIC_API_URL=http://localhost:3000 
+    volumes:
+      - .:/app
+      - /app/node_modules # Évite que les node_modules locaux écrasent ceux du conteneur (très important sous Mac/Linux)
+    restart: unless-stopped

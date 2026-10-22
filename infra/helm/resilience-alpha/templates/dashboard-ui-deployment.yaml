@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-ui
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: dashboard-ui
+    tier: frontend
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  replicas: {{ if .Values.global.noReplica }}1{{ else }}{{ .Values.dashboardUi.replicaCount }}{{ end }}
+  selector:
+    matchLabels:
+      app: dashboard-ui
+  template:
+    metadata:
+      labels:
+        app: dashboard-ui
+        tier: frontend
+    spec:
+      containers:
+        - name: dashboard-ui
+          image: "{{ .Values.dashboardUi.image.repository }}:{{ .Values.dashboardUi.image.tag }}"
+          imagePullPolicy: {{ .Values.dashboardUi.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.dashboardUi.service.port }}
+              name: http
+          resources:
+            {{- toYaml .Values.dashboardUi.resources | nindent 12 }}
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: dashboard-ui-nginx-conf

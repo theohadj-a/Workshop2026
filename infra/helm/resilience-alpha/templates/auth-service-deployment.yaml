@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: auth-service
+    tier: security
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.authService.replicaCount }}
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        tier: security
+    spec:
+      containers:
+        - name: auth-service
+          image: "{{ .Values.authService.image.repository }}:{{ .Values.authService.image.tag }}"
+          imagePullPolicy: {{ .Values.authService.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.authService.service.port }}
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "{{ .Values.authService.env.serviceName }}"
+            - name: PORT
+              value: "{{ .Values.authService.env.port }}"
+            - name: JWT_SECRET
+              value: "{{ .Values.authService.env.jwtSecret }}"
+            - name: JWT_ALGORITHM
+              value: "{{ .Values.authService.env.jwtAlgorithm }}"
+            - name: JWT_EXPIRATION_HOURS
+              value: "{{ .Values.authService.env.jwtExpirationHours }}"
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.authService.livenessProbe.path }}
+              port: {{ .Values.authService.service.port }}
+            initialDelaySeconds: {{ .Values.authService.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.authService.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.authService.readinessProbe.path }}
+              port: {{ .Values.authService.service.port }}
+            initialDelaySeconds: {{ .Values.authService.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.authService.readinessProbe.periodSeconds }}
+          resources:
+            {{- toYaml .Values.authService.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false

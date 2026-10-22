@@ -1,0 +1,24 @@
+{{- if and .Values.paymentApi.autoscaling.enabled (not .Values.global.noReplica) }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-api-hpa
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: payment-api
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-api
+  minReplicas: {{ .Values.paymentApi.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.paymentApi.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.paymentApi.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

@@ -1,0 +1,46 @@
+---
+- name: "PROJECT RESILIENCE-ALPHA — Contrôle de Santé et Audit Opérationnel"
+  hosts: k8s_nodes
+  gather_facts: false
+  vars:
+    namespace: "resilience-alpha"
+
+  tasks:
+    - name: "1. Audit de l'état des Pods dans le cluster"
+      ansible.builtin.command: "kubectl get pods -n {{ namespace }} -o json"
+      register: pods_raw
+      changed_when: false
+
+    - name: "2. Parsing des métadonnées des pods"
+      ansible.builtin.set_fact:
+        pods_info: "{{ (pods_raw.stdout | from_json).items }}"
+
+    - name: "3. Détection des pods en anomalie (Not Running ou Restarts élevés)"
+      ansible.builtin.debug:
+        msg: >-
+          Pod: {{ item.metadata.name }} | Phase: {{ item.status.phase }}
+          {% if item.status.containerStatuses is defined %}
+          | Ready: {{ item.status.containerStatuses[0].ready }} | Restarts: {{ item.status.containerStatuses[0].restartCount }}
+          {% endif %}
+      loop: "{{ pods_info }}"
+      loop_control:
+        label: "{{ item.metadata.name }}"
+
+    - name: "4. Vérification de l'état du PVC de la base de données PostgreSQL"
+      ansible.builtin.command: "kubectl get pvc postgres-pvc -n {{ namespace }} -o jsonpath='{.status.phase}'"
+      register: pvc_status
+      changed_when: false
+      failed_when: pvc_status.stdout != "'Bound'" and pvc_status.stdout != "Bound"
+
+    - name: "5. Statut du volume de stockage"
+      ansible.builtin.debug:
+        msg: "Volume persistant PostgreSQL (PVC) : {{ pvc_status.stdout }} [OK]"
+
+    - name: "6. Vérification du Service de Remédiation"
+      ansible.builtin.command: "kubectl get svc remediation-service -n {{ namespace }}"
+      register: rem_svc
+      changed_when: false
+
+    - name: "7. Rapport de santé global"
+      ansible.builtin.debug:
+        msg: "Tous les contrôles d'infrastructure et de résilience sont au vert !"

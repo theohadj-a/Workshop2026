@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiops-detector
+  namespace: resilience-alpha
+  labels:
+    app: aiops-detector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aiops-detector
+  template:
+    metadata:
+      labels:
+        app: aiops-detector
+    spec:
+      containers:
+        - name: aiops-detector
+          image: aiops-detector:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PAYMENT_API_URL
+              value: "http://payment-api-service:8000"
+            - name: REMEDIATION_WEBHOOK_URL
+              value: "http://remediation-service:8001/api/v1/remediation/alert"
+            - name: CHECK_INTERVAL_SEC
+              value: "3.0"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10003
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false

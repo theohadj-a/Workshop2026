@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: payment-api
+    tier: backend
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  replicas: {{ if .Values.global.noReplica }}1{{ else }}{{ .Values.paymentApi.replicaCount }}{{ end }}
+  selector:
+    matchLabels:
+      app: payment-api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: payment-api
+        tier: backend
+    spec:
+      containers:
+        - name: payment-api
+          image: "{{ .Values.paymentApi.image.repository }}:{{ .Values.paymentApi.image.tag }}"
+          imagePullPolicy: {{ .Values.paymentApi.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.paymentApi.service.port }}
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "{{ .Values.paymentApi.env.serviceName }}"
+            - name: PORT
+              value: "{{ .Values.paymentApi.env.port }}"
+            - name: DB_PATH
+              value: "{{ .Values.paymentApi.env.dbPath }}"
+            - name: DATABASE_URL
+              value: "{{ .Values.paymentApi.env.databaseUrl }}"
+          resources:
+            {{- toYaml .Values.paymentApi.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.paymentApi.livenessProbe.path }}
+              port: {{ .Values.paymentApi.service.port }}
+            initialDelaySeconds: {{ .Values.paymentApi.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.paymentApi.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.paymentApi.readinessProbe.path }}
+              port: {{ .Values.paymentApi.service.port }}
+            initialDelaySeconds: {{ .Values.paymentApi.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.paymentApi.readinessProbe.periodSeconds }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false

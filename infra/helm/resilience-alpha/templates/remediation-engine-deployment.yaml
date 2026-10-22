@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remediation-engine
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: remediation-engine
+    tier: control
+    {{- include "resilience-alpha.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.remediationEngine.replicaCount }}
+  selector:
+    matchLabels:
+      app: remediation-engine
+  template:
+    metadata:
+      labels:
+        app: remediation-engine
+        tier: control
+    spec:
+      serviceAccountName: remediation-engine-sa
+      containers:
+        - name: remediation-engine
+          image: "{{ .Values.remediationEngine.image.repository }}:{{ .Values.remediationEngine.image.tag }}"
+          imagePullPolicy: {{ .Values.remediationEngine.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.remediationEngine.service.port }}
+              name: http
+          env:
+            - name: SERVICE_NAME
+              value: "{{ .Values.remediationEngine.env.serviceName }}"
+            - name: PORT
+              value: "{{ .Values.remediationEngine.env.port }}"
+            - name: K8S_NAMESPACE
+              value: "{{ .Values.global.namespace }}"
+            - name: PAYMENT_API_URL
+              value: "{{ .Values.remediationEngine.env.paymentApiUrl }}"
+          resources:
+            {{- toYaml .Values.remediationEngine.resources | nindent 12 }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10002
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false

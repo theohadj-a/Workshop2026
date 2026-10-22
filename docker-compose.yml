@@ -1,0 +1,103 @@
+services:
+  payment-api:
+    build:
+      context: ./services/payment-api
+      dockerfile: Dockerfile
+    container_name: resilience-payment-api
+    restart: unless-stopped
+    # Port restreint à localhost pour le débogage local (pour forcer le trafic externe / WAF sur le port 3000)
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - SERVICE_NAME=payment-api
+      - PORT=8000
+      - DB_PATH=/app/data/payments.db
+    volumes:
+      - payment_data:/app/data
+    networks:
+      - resilience-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8000/health').getcode() == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  remediation-engine:
+    build:
+      context: ./services/remediation-engine
+      dockerfile: Dockerfile
+    container_name: resilience-remediation-engine
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - SERVICE_NAME=remediation-engine
+      - PORT=8001
+      - PAYMENT_API_URL=http://resilience-payment-api:8000
+    networks:
+      - resilience-net
+    depends_on:
+      payment-api:
+        condition: service_healthy
+
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: resilience-auth-service
+    restart: unless-stopped
+    # Port restreint à localhost pour le débogage local (accès extérieur via Nginx WAF /api/v1/auth/)
+    ports:
+      - "127.0.0.1:8002:8002"
+    environment:
+      - SERVICE_NAME=auth-service
+      - PORT=8002
+      - JWT_SECRET=soc-resilience-secret-key-2026
+    networks:
+      - resilience-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8002/health').getcode() == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  dashboard-ui:
+    build:
+      context: ./services/dashboard-ui
+      dockerfile: Dockerfile
+    container_name: resilience-dashboard-ui
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - resilience-net
+    depends_on:
+      - payment-api
+      - auth-service
+
+  aiops-detector:
+    build:
+      context: ./ai-ops/detector
+      dockerfile: Dockerfile
+    container_name: resilience-aiops-detector
+    restart: unless-stopped
+    environment:
+      - PAYMENT_API_URL=http://resilience-payment-api:8000
+      - REMEDIATION_WEBHOOK_URL=http://resilience-remediation-engine:8001/api/v1/remediation/alert
+      - CHECK_INTERVAL_SEC=3.0
+    networks:
+      - resilience-net
+    depends_on:
+      payment-api:
+        condition: service_healthy
+      remediation-engine:
+        condition: service_started
+
+networks:
+  resilience-net:
+    driver: bridge
+
+volumes:
+  payment_data:
