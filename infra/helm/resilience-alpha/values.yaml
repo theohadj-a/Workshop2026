@@ -33,7 +33,7 @@ paymentApi:
     tag: latest
     pullPolicy: IfNotPresent
   service:
-    type: ClusterIP
+    type: NodePort
     port: 8000
   env:
     serviceName: payment-api
@@ -87,7 +87,7 @@ remediationEngine:
     tag: latest
     pullPolicy: IfNotPresent
   service:
-    type: ClusterIP
+    type: NodePort
     port: 8001
   env:
     serviceName: remediation-engine
