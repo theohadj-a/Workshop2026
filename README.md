@@ -138,6 +138,19 @@ python -m pytest services/remediation-engine/tests -v
 
 Le module **Attaquant** est conçu pour s'exécuter de façon autonome depuis le **PC de l'attaquant** (sur le réseau local ou le point d'accès Wi-Fi de l'exercice), complètement découplé du cluster Kubernetes de défense.
 
+### 📋 Synthèse Complète des Attaques (Aide-Mémoire Soutenance)
+
+| # | Type d'Attaque | Disponible Sur | Commande CLI ou Action Front | Route Cible | Effet Attendu & Réaction Défense | Objectif Démonstration Jury |
+| :-: | :--- | :--- | :--- | :--- | :--- | :--- |
+| **1** | **Scan OWASP** | 🐍 **Python CLI uniquement** *(sécurité navigateur)* | `python python/attack.py --host <IP> --port 3000 --mode scanner` | `GET /api/v1/payments` *(User-Agent `sqlmap` / `nikto`)* | **Bloqué net par le WAF (HTTP 403 Forbidden)**. Aucune sollicitation du backend. | Prouver l'efficacité du filtrage de réputation et de signature L7. |
+| **2** | **HTTP Flood Volumétrique** | 🌐 **Front Web**<br>ou 🐍 **CLI** | Bouton *"Lancer le HTTP Flood"*<br>ou `python python/attack.py --host <IP> --port 3000 --mode flood --duration 20 --threads 15` | `POST /api/v1/payments` | **Rate-limité par le WAF (HTTP 429)** (5 req/s max, burst 10). Si persistant : **Scale HPA Kubernetes** (jusqu'à 8 réplicas). | Démontrer le rate limiting applicatif et l'élasticité horizontale d'infra. |
+| **3** | **Slowloris (Connexions lentes)** | 🐍 **Python CLI uniquement** *(sockets TCP bruts)* | `python python/attack.py --host <IP> --port 3000 --mode slowloris --duration 45` | Sockets TCP bruts *(headers partiels keep-alive)* | **Passe le WAF** *(faille volontaire)* ➔ Sature les sockets ➔ **AIOps ML (Isolation Forest) détecte l'explosion de latence** ➔ **Rollout restart Zero-Touch**. | Prouver la détection comportementale L4/L7 par Machine Learning. |
+| **4** | **Chaos & Dégradation API** | 🌐 **Front Web**<br>ou 🐍 **CLI** | Bouton *"Appliquer le Chaos"*<br>ou `python python/attack.py --host <IP> --port 3000 --mode chaos` | `POST /api/v1/chaos/configure` | **Passe le WAF** *(requête JSON valide)* ➔ 65% erreurs 500 et 1.2s latence ➔ **L'Isolation Forest signale l'incident** ➔ **Reprise autonome Zero-Touch**. | Démontrer la détection d'une anomalie statistique subtile sans crash physique. |
+| **5** | **Crash Brutal du Pod** | 🌐 **Front Web**<br>ou 💻 **cURL** | Bouton *"Crash Fatal"*<br>ou `curl -X POST http://<IP>:3000/api/v1/chaos/crash` | `POST /api/v1/chaos/crash` | Le conteneur se termine brutalement (`exit 1`) ➔ **Pod en CrashLoop** ➔ **Sonde Liveness K8s & surveillance native recréent le pod**. | Démontrer le self-healing automatique face à une panne physique brutale. |
+| **6** | **Scénario Démo Clé en Main** | 🐍 **Python CLI** | `python python/attack.py --host <IP> --port 3000 --mode demo` | Enchaîne : Scan ➔ Chaos ➔ Flood | **Enchaînement automatique des 3 niveaux de défense** en 30 secondes. | Présentation fluide et dynamique pour la soutenance orale. |
+
+---
+
 ### Démarrage Rapide via Docker Compose
 
 1. **Se positionner dans le dossier de l'attaquant** :
